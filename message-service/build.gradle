@@ -1,0 +1,37 @@
+plugins {
+    id("java")
+    id("application")
+}
+
+def targetArch = project.findProperty('targetArch') ?: 'linux-x86_64'
+def epollClassifier = (targetArch in ['linux-aarch_64', 'aarch64']) ? 'linux-aarch_64' : 'linux-x86_64'
+
+dependencies {
+    implementation platform(libs.netty.bom)
+    implementation libs.bundles.netty
+    implementation libs.bundles.slf4j
+
+    implementation "${libs.netty.transport.native.epoll.get().module}:$epollClassifier"
+
+    testImplementation libs.bundles.testing.suite
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${libs.versions.junit.get()}"
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+application {
+    mainClass.set("Main")
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(26))
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
