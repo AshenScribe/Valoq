@@ -1,0 +1,11 @@
+serverPort: 8000
+host: localhost
+databasePort: 5432
+username: valoq
+password: valoq
+databaseName: valoq
+sslMode: disable
+sslCertPath:
+sslKeyPath:
+sslRootCertPath:
+jwtExpirationTime: 300

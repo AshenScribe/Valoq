@@ -1,0 +1,123 @@
+import java.security.KeyPairGenerator
+
+plugins {
+    id("java")
+    id("application")
+    id 'com.diffplug.spotless' version '7.2.1'
+    id 'checkstyle'
+}
+
+def targetArch = project.findProperty('targetArch') ?: 'linux-x86_64'
+def epollClassifier = (targetArch in ['linux-aarch_64', 'aarch64']) ? 'linux-aarch_64' : 'linux-x86_64'
+
+dependencies {
+    implementation platform(libs.netty.bom)
+    implementation libs.bundles.netty
+    implementation libs.bundles.slf4j
+
+    implementation(variantOf(libs.netty.transport.native.epoll) {
+        classifier(epollClassifier)
+    })
+
+    testImplementation libs.bundles.testing.suite
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${libs.versions.junit.get()}"
+    testRuntimeOnly libs.junit.platform.launcher
+    implementation(libs.jjwt.api)
+    runtimeOnly(libs.jjwt.impl)
+    runtimeOnly(libs.jjwt.jackson)
+
+    implementation libs.snake.yaml
+}
+
+application {
+    mainClass.set("Main")
+    applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(26))
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
+test {
+    testLogging {
+        events "passed", "skipped", "failed"
+        showStandardStreams = false
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+        exceptionFormat = 'full'
+    }
+    afterSuite { desc, result ->
+        if (!desc.parent) {
+            println "\nTest Summary: ${result.resultType}"
+            println "  Passed: ${result.successfulTestCount}"
+            println "  Failed: ${result.failedTestCount}"
+            println "  Skipped: ${result.skippedTestCount}"
+            println "  Total:   ${result.testCount}\n"
+        }
+    }
+}
+
+spotless {
+    java {
+        palantirJavaFormat()
+        removeUnusedImports()
+    }
+}
+
+checkstyle {
+    toolVersion = '10.26.1'
+    configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
+}
+
+tasks.named('checkstyleMain') {
+    dependsOn 'spotlessApply'
+}
+
+tasks.named('check') {
+    dependsOn 'test'
+    dependsOn 'checkstyleMain'
+}
+
+tasks.register('generateDevRsaKeys') {
+    def outputDir = layout.buildDirectory.dir("generated/dev-keys")
+    outputs.dir(outputDir)
+
+    doLast {
+        def keyFolder = outputDir.get().asFile
+        if (!keyFolder.exists()) {
+            keyFolder.mkdirs()
+        }
+
+        def privateKeyFile = new File(keyFolder, "private.key")
+        def publicKeyFile = new File(keyFolder, "public.key")
+
+        if (!privateKeyFile.exists() || !publicKeyFile.exists()) {
+            println "Generating new dev RSA key pair..."
+            def keyPairGen = KeyPairGenerator.getInstance("RSA")
+            keyPairGen.initialize(2048)
+            def keyPair = keyPairGen.generateKeyPair()
+
+            privateKeyFile.text = Base64.encoder.encodeToString(keyPair.private.encoded)
+            publicKeyFile.text = Base64.encoder.encodeToString(keyPair.public.encoded)
+        }
+    }
+}
+
+sourceSets.main.resources {
+    srcDir layout.buildDirectory.dir("generated/dev-keys")
+}
+
+tasks.named('processResources') {
+    dependsOn tasks.named('generateDevRsaKeys')
+}

@@ -1,0 +1,47 @@
+[versions]
+groovy = "3.0.5"
+jjwt = "0.13.0"
+junit = "5.7.1"
+netty = "4.2.18.Final"
+slf4j = "2.0.19"
+snake-yaml = "2.7"
+
+[libraries]
+groovy-core = { module = "org.codehaus.groovy:groovy", version.ref = "groovy" }
+
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit" }
+
+jjwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jjwt" }
+jjwt-impl = { group = "io.jsonwebtoken", name = "jjwt-impl", version.ref = "jjwt" }
+jjwt-jackson = { group = "io.jsonwebtoken", name = "jjwt-jackson", version.ref = "jjwt" }
+
+netty-bom = { module = "io.netty:netty-bom", version.ref = "netty" }
+netty-buffer = { module = "io.netty:netty-buffer" }
+netty-handler = { module = "io.netty:netty-handler" }
+netty-transport = { module = "io.netty:netty-transport" }
+netty-common = { module = "io.netty:netty-common" }
+netty-codec = { module = "io.netty:netty-codec" }
+netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll" }
+
+snake-yaml = { module = "org.yaml:snakeyaml", version.ref = "snake-yaml" }
+
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+
+[bundles]
+testing-suite = ["groovy-core", "junit-jupiter-api", "junit-jupiter-engine", "junit-jupiter-params"]
+netty = [
+    "netty-buffer",
+    "netty-transport",
+    "netty-common",
+    "netty-codec",
+    "netty-transport-native-epoll",
+    "netty-handler"
+]
+slf4j = [
+    "slf4j-api",
+    "slf4j-simple"
+]

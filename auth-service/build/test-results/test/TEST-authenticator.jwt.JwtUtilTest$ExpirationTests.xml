@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Expiration &amp; Time Edge Cases" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-15T18:08:22.909Z" hostname="rishabh" time="0.015">
+  <properties/>
+  <testcase name="Should reject expired token generated in the past" classname="authenticator.jwt.JwtUtilTest$ExpirationTests" time="0.006"/>
+  <testcase name="Should reject token issued in the future (nbf / iat drift)" classname="authenticator.jwt.JwtUtilTest$ExpirationTests" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

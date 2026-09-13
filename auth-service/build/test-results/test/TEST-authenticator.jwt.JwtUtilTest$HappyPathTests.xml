@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Happy Path Tests" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-15T18:08:22.925Z" hostname="rishabh" time="0.014">
+  <properties/>
+  <testcase name="Singleton instance should always return the same reference" classname="authenticator.jwt.JwtUtilTest$HappyPathTests" time="0.001"/>
+  <testcase name="Should successfully generate and parse token end-to-end" classname="authenticator.jwt.JwtUtilTest$HappyPathTests" time="0.006"/>
+  <testcase name="Should parse externally generated valid JWT correctly" classname="authenticator.jwt.JwtUtilTest$HappyPathTests" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

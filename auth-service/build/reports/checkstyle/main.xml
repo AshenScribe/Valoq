@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="10.26.1">
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/config/ServerConfig.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/config/ConfigLoader.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/server/command/AuthCommand.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/server/command/RegisterCommand.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/server/command/BasicCommand.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/server/command/TokenCommand.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/server/handler/PublicKeyHandler.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/server/handler/AuthenticationHandlerFactory.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/server/handler/AuthenticationHandler.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/server/AuthServer.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/server/codec/CommandDecoder.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/Main.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/authenticator/Authenticator.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/authenticator/jwt/JwtUtil.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/authenticator/jwt/KeyProvider.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/authenticator/TokenAuthenticator.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/authenticator/RegisterAuthenticator.java">
+</file>
+<file name="/home/rishabh/Valoq/auth-service/src/main/java/authenticator/BasicAuthenticator.java">
+</file>
+</checkstyle>
