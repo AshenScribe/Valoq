@@ -1,13 +1,13 @@
 package server;
 
 public class Session {
-	private String userId;
+    private String userId;
 
-	public String getUserId() {
-		return userId;
-	}
+    public String getUserId() {
+        return userId;
+    }
 
-	public void setUserId(String userId) {
-		this.userId = userId;
-	}
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
 }

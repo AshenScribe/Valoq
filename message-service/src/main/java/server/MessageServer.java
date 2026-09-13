@@ -7,13 +7,10 @@ import io.netty.channel.epoll.EpollIoHandler;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.MessageToMessageDecoder;
 import io.netty.handler.codec.string.StringDecoder;
 import io.netty.util.AttributeKey;
-import server.handler.InitVerbHandler;
-
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+import server.handler.InitVerbHandler;
 
 public class MessageServer {
 
@@ -22,13 +19,13 @@ public class MessageServer {
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
 
-	private final IoHandlerFactory factory = Epoll.isAvailable()
-			? EpollIoHandler.newFactory()
-			: NioIoHandler.newFactory();
+    private static final ConnectionTracker CONNECTION_TRACKER = new ConnectionTracker();
 
-	private final Class<? extends ServerChannel> channelClass = Epoll.isAvailable()
-			? EpollServerSocketChannel.class
-			: NioServerSocketChannel.class;
+    private final IoHandlerFactory factory =
+            Epoll.isAvailable() ? EpollIoHandler.newFactory() : NioIoHandler.newFactory();
+
+    private final Class<? extends ServerChannel> channelClass =
+            Epoll.isAvailable() ? EpollServerSocketChannel.class : NioServerSocketChannel.class;
 
     public MessageServer(int port) {
         this.port = port;
@@ -57,18 +54,28 @@ public class MessageServer {
         }
     }
 
-	public static class MessageServerInitializer extends ChannelInitializer<Channel> {
+    public static class MessageServerInitializer extends ChannelInitializer<Channel> {
 
-		public final static AttributeKey<Session> SESSION_KEY = AttributeKey.newInstance("session");
+        public static final AttributeKey<Session> SESSION_KEY = AttributeKey.newInstance("session");
 
-		public MessageServerInitializer() {
-			super();
-		}
+        public MessageServerInitializer() {
+            super();
+        }
 
-		protected void initChannel(Channel ch) {
-			ch.attr(SESSION_KEY).set(new Session());
-			ch.pipeline().addLast("stringDecoder", new StringDecoder(StandardCharsets.UTF_8));
-			ch.pipeline().addLast("initVerbHandler", new InitVerbHandler());
-		}
-	}
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) {
+            Session session = ctx.channel().attr(SESSION_KEY).get();
+
+            if (session != null && session.getUserId() != null)
+                CONNECTION_TRACKER.unregister(session.getUserId(), ctx.channel());
+
+            ctx.fireChannelInactive();
+        }
+
+        protected void initChannel(Channel ch) {
+            ch.attr(SESSION_KEY).set(new Session());
+            ch.pipeline().addLast("stringDecoder", new StringDecoder(StandardCharsets.UTF_8));
+            ch.pipeline().addLast("initVerbHandler", new InitVerbHandler(CONNECTION_TRACKER));
+        }
+    }
 }

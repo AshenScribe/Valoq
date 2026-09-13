@@ -1,6 +1,8 @@
 plugins {
     id("java")
     id("application")
+    id 'com.diffplug.spotless' version '7.2.1'
+    id 'checkstyle'
 }
 
 def targetArch = project.findProperty('targetArch') ?: 'linux-x86_64'
@@ -34,4 +36,45 @@ repositories {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+test {
+    testLogging {
+        events "passed", "skipped", "failed"
+        showStandardStreams = false
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+        exceptionFormat = 'full'
+    }
+    afterSuite { desc, result ->
+        if (!desc.parent) {
+            println "\nTest Summary: ${result.resultType}"
+            println "  Passed: ${result.successfulTestCount}"
+            println "  Failed: ${result.failedTestCount}"
+            println "  Skipped: ${result.skippedTestCount}"
+            println "  Total:   ${result.testCount}\n"
+        }
+    }
+}
+
+spotless {
+    java {
+        palantirJavaFormat()
+        removeUnusedImports()
+    }
+}
+
+checkstyle {
+    toolVersion = '10.26.1'
+    configFile = file("${rootDir}/.config/checkstyle/checkstyle.xml")
+}
+
+tasks.named('checkstyleMain') {
+    dependsOn 'spotlessApply'
+}
+
+tasks.named('check') {
+    dependsOn 'test'
+    dependsOn 'checkstyleMain'
 }
