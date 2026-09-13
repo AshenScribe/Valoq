@@ -9,6 +9,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import server.ConnectionTracker;
+import server.MessageRouter;
 import server.MessageServer;
 import server.Session;
 
@@ -24,7 +25,7 @@ class ChatMessageHandlerTest {
     void setup() {
         connectionTracker = new ConnectionTracker();
 
-        senderChannel = new EmbeddedChannel(new ChatMessageHandler(connectionTracker));
+        senderChannel = new EmbeddedChannel(new ChatMessageHandler(new MessageRouter(connectionTracker)));
 
         Session session = new Session();
         session.setUserId(TEST_USER_ID);

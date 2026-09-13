@@ -6,6 +6,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import server.ConnectionTracker;
+import server.MessageRouter;
 import server.MessageServer;
 import server.Session;
 
@@ -31,7 +32,8 @@ public class InitVerbHandler extends SimpleChannelInboundHandler<String> {
             session.setUserId(userId);
             ctx.writeAndFlush("SUCCESS\n");
             connectionTracker.register(userId, ctx.channel());
-            ctx.pipeline().replace(this, "chatMessageHandler", new ChatMessageHandler(connectionTracker));
+            ctx.pipeline()
+                    .replace(this, "chatMessageHandler", new ChatMessageHandler(new MessageRouter(connectionTracker)));
         } else {
             ctx.writeAndFlush("INVALID\n").addListener(ChannelFutureListener.CLOSE);
         }
