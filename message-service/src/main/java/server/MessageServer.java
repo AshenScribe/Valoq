@@ -2,7 +2,6 @@ package server;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -80,16 +79,6 @@ public class MessageServer {
         public MessageServerInitializer(ConnectionTracker connectionTracker) {
             super();
             this.CONNECTION_TRACKER = connectionTracker;
-        }
-
-        @Override
-        public void channelInactive(ChannelHandlerContext ctx) {
-            Session session = ctx.channel().attr(SESSION_KEY).get();
-
-            if (session != null && session.getUserId() != null)
-                CONNECTION_TRACKER.unregister(session.getUserId(), ctx.channel());
-
-            ctx.fireChannelInactive();
         }
 
         @Override
