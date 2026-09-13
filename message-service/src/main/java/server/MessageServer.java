@@ -19,6 +19,7 @@ import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.AttributeKey;
 import java.nio.charset.StandardCharsets;
+import server.handler.ConnectionLifecycleHandler;
 import server.handler.InitVerbHandler;
 
 public class MessageServer {
@@ -28,7 +29,7 @@ public class MessageServer {
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
 
-    private static final ConnectionTracker CONNECTION_TRACKER = new ConnectionTracker();
+    private final ConnectionTracker CONNECTION_TRACKER = new ConnectionTracker();
 
     private final IoHandlerFactory factory =
             Epoll.isAvailable() ? EpollIoHandler.newFactory() : NioIoHandler.newFactory();
@@ -48,7 +49,7 @@ public class MessageServer {
                 .group(bossGroup, workerGroup)
                 .channel(channelClass)
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
-                .childHandler(new MessageServerInitializer());
+                .childHandler(new MessageServerInitializer(CONNECTION_TRACKER));
 
         channel = bootstrap.bind(port).sync().channel();
     }
@@ -63,12 +64,22 @@ public class MessageServer {
         }
     }
 
+    ConnectionTracker getConnectionTracker() {
+        return CONNECTION_TRACKER;
+    }
+
+    public int getPort() {
+        return ((java.net.InetSocketAddress) channel.localAddress()).getPort();
+    }
+
     public static class MessageServerInitializer extends ChannelInitializer<Channel> {
 
         public static final AttributeKey<Session> SESSION_KEY = AttributeKey.newInstance("session");
+        private final ConnectionTracker CONNECTION_TRACKER;
 
-        public MessageServerInitializer() {
+        public MessageServerInitializer(ConnectionTracker connectionTracker) {
             super();
+            this.CONNECTION_TRACKER = connectionTracker;
         }
 
         @Override
@@ -90,6 +101,7 @@ public class MessageServer {
             ch.pipeline().addLast("stringDecoder", new StringDecoder(StandardCharsets.UTF_8));
             ch.pipeline().addLast("logger", new LoggingHandler());
             ch.pipeline().addLast("initVerbHandler", new InitVerbHandler(CONNECTION_TRACKER));
+            ch.pipeline().addLast("connectionLifecycleHandler", new ConnectionLifecycleHandler(CONNECTION_TRACKER));
         }
     }
 }

@@ -11,7 +11,7 @@ class MessageServerInitializerTest {
 
     @BeforeEach
     public void setUp() {
-        channel = new EmbeddedChannel(new MessageServer.MessageServerInitializer());
+        channel = new EmbeddedChannel(new MessageServer.MessageServerInitializer(new ConnectionTracker()));
     }
 
     @Test
