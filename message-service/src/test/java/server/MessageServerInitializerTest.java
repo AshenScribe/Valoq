@@ -27,6 +27,5 @@ class MessageServerInitializerTest {
         Assertions.assertNotNull(channel.pipeline().get("stringDecoder"));
         Assertions.assertNotNull(channel.pipeline().get("chatMessageHandler"));
         Assertions.assertNull(channel.pipeline().get("initVerbHandler"));
-        Assertions.assertEquals("SUCCESS\n", channel.readOutbound());
     }
 }

@@ -22,21 +22,16 @@ public class InitVerbHandler extends SimpleChannelInboundHandler<String> {
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, String msg) {
         final Matcher matcher = INIT_PATTERN.matcher(msg.trim());
-
         if (matcher.matches() && matcher.groupCount() == 2) {
             final Session session = ctx.channel()
                     .attr(MessageServer.MessageServerInitializer.SESSION_KEY)
                     .get();
 
-            if (session != null) {
-                final String userId = matcher.group(2);
-                session.setUserId(userId);
-                ctx.writeAndFlush("SUCCESS\n");
-                connectionTracker.register(userId, ctx.channel());
-                ctx.pipeline().replace(this, "chatMessageHandler", new ChatMessageHandler(connectionTracker));
-            } else {
-                throw new IllegalStateException("Session attribute not attached to Channel");
-            }
+            final String userId = matcher.group(2);
+            session.setUserId(userId);
+            ctx.writeAndFlush("SUCCESS\n");
+            connectionTracker.register(userId, ctx.channel());
+            ctx.pipeline().replace(this, "chatMessageHandler", new ChatMessageHandler(connectionTracker));
         } else {
             ctx.writeAndFlush("INVALID\n").addListener(ChannelFutureListener.CLOSE);
         }

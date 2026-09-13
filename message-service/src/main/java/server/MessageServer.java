@@ -1,13 +1,22 @@
 package server;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.IoHandlerFactory;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.ServerChannel;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollIoHandler;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.string.StringDecoder;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.AttributeKey;
 import java.nio.charset.StandardCharsets;
 import server.handler.InitVerbHandler;
@@ -72,9 +81,14 @@ public class MessageServer {
             ctx.fireChannelInactive();
         }
 
+        @Override
         protected void initChannel(Channel ch) {
             ch.attr(SESSION_KEY).set(new Session());
+            ch.pipeline()
+                    .addLast("stringEncoder", new io.netty.handler.codec.string.StringEncoder(StandardCharsets.UTF_8));
+            ch.pipeline().addLast("lineBasedFrameDecoder", new LineBasedFrameDecoder(1024));
             ch.pipeline().addLast("stringDecoder", new StringDecoder(StandardCharsets.UTF_8));
+            ch.pipeline().addLast("logger", new LoggingHandler());
             ch.pipeline().addLast("initVerbHandler", new InitVerbHandler(CONNECTION_TRACKER));
         }
     }

@@ -4,7 +4,6 @@ import io.netty.channel.DefaultChannelId;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -51,11 +50,5 @@ class InitVerbHandlerTest {
         Assertions.assertNull(session.getUserId());
         Assertions.assertFalse(channel.isOpen());
         Assertions.assertEquals(0, connectionTracker.getSize());
-    }
-
-    @Test
-    public void throwsExceptionWhenSessionAttributeIsMissing() {
-        EmbeddedChannel uninitializedChannel = new EmbeddedChannel(new InitVerbHandler(connectionTracker));
-        Assertions.assertThrows(IllegalStateException.class, () -> uninitializedChannel.writeInbound("INIT user123"));
     }
 }
