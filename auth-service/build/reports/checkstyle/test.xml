@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<checkstyle version="10.26.1">
-<file name="/home/rishabh/Valoq/auth-service/src/test/java/server/codec/CommandDecoderTest.java">
-</file>
-<file name="/home/rishabh/Valoq/auth-service/src/test/java/authenticator/jwt/JwtUtilTest.java">
-</file>
-</checkstyle>
