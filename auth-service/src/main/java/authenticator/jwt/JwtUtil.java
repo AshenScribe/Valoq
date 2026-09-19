@@ -6,6 +6,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.Date;
 import java.util.Map;
+import java.util.Optional;
 
 public final class JwtUtil {
 
@@ -60,15 +61,15 @@ public final class JwtUtil {
         }
     }
 
-    public Claims parseJwt(String jwt) {
+    public Optional<Claims> parseJwt(String jwt) {
         try {
-            return Jwts.parser()
+            return Optional.of(Jwts.parser()
                     .verifyWith(publicKey)
                     .build()
                     .parseSignedClaims(jwt)
-                    .getPayload();
+                    .getPayload());
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse JWT", e);
+            return Optional.empty();
         }
     }
 }

@@ -15,8 +15,9 @@ import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LineBasedFrameDecoder;
+import io.netty.handler.codec.string.LineEncoder;
+import io.netty.handler.codec.string.LineSeparator;
 import io.netty.handler.codec.string.StringDecoder;
-import io.netty.handler.codec.string.StringEncoder;
 import java.nio.charset.StandardCharsets;
 import server.codec.CommandDecoder;
 import server.handler.AuthenticationHandler;
@@ -44,6 +45,13 @@ public class AuthServer {
         channelFuture = bootstrap.bind(port).sync().channel();
     }
 
+    public int getPort() {
+        if (channelFuture != null && channelFuture.localAddress() instanceof java.net.InetSocketAddress addr) {
+            return addr.getPort();
+        }
+        return port;
+    }
+
     public void stop() {
         if (channelFuture != null) {
             channelFuture.close();
@@ -55,7 +63,7 @@ public class AuthServer {
     private static final class AuthServerInitializer extends ChannelInitializer<SocketChannel> {
         @Override
         protected void initChannel(SocketChannel ch) {
-            ch.pipeline().addLast("stringEncoder", new StringEncoder(StandardCharsets.UTF_8));
+            ch.pipeline().addLast("lineEncoder", new LineEncoder(LineSeparator.UNIX, StandardCharsets.UTF_8));
             ch.pipeline().addLast("lineBasedFrameDecoder1024", new LineBasedFrameDecoder(1024));
             ch.pipeline().addLast("stringDecoder", new StringDecoder(StandardCharsets.UTF_8));
             ch.pipeline().addLast("publicKeyHandler", new PublicKeyHandler());

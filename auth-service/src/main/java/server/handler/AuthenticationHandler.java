@@ -24,7 +24,7 @@ public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthComma
                 })
                 .exceptionally(ex -> {
                     ctx.channel().eventLoop().execute(() -> {
-                        ctx.fireExceptionCaught(ex);
+                        ctx.writeAndFlush("ERROR " + ex.getCause().getMessage());
                     });
                     return null;
                 });

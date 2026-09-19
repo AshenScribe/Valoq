@@ -28,8 +28,10 @@ public class CommandDecoder extends MessageToMessageDecoder<String> {
         AuthCommand authCommand =
                 switch (matcher.group(1)) {
                     case "TOKEN" -> new TokenCommand(matcher.group(2));
-                    case "BASIC" -> new BasicCommand(
-                            matcher.group(2).split(":")[0], matcher.group(2).split(":")[1]);
+                    case "BASIC" -> {
+                        String[] parts = matcher.group(2).split(":");
+                        yield new BasicCommand(parts[0], parts[1], parts[2]);
+                    }
                     case "REGISTER" -> new RegisterCommand(matcher.group(2));
                     default -> throw new IllegalStateException(
                             String.format("invalid command type: %s\nExpected TOKEN/BASIC/REGISTER", matcher.group(1)));

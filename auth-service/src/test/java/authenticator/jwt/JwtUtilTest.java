@@ -2,7 +2,6 @@ package authenticator.jwt;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.SignatureException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -66,7 +65,7 @@ class JwtUtilTest {
             String token = jwtUtil.generateJwt(subject, 300000L, claimsMap);
             Assertions.assertNotNull(token, "Generated JWT string should not be null");
 
-            Claims claims = jwtUtil.parseJwt(token);
+            Claims claims = jwtUtil.parseJwt(token).get();
             Assertions.assertEquals(subject, claims.getSubject());
             Assertions.assertEquals("ADMIN", claims.get("role", String.class));
             Assertions.assertEquals("12345", claims.get("tenantId", String.class));
@@ -90,7 +89,7 @@ class JwtUtilTest {
                     .signWith(privateKey, Jwts.SIG.RS256)
                     .compact();
 
-            Claims claims = jwtUtil.parseJwt(jwt);
+            Claims claims = jwtUtil.parseJwt(jwt).get();
             Assertions.assertNotNull(claims);
             Assertions.assertEquals(expectedSubject, claims.getSubject());
             Assertions.assertEquals(expectedRole, claims.get("role", String.class));
@@ -122,11 +121,7 @@ class JwtUtilTest {
                     .signWith(privateKey, Jwts.SIG.RS256)
                     .compact();
 
-            RuntimeException exception =
-                    Assertions.assertThrows(RuntimeException.class, () -> jwtUtil.parseJwt(expiredJwt));
-
-            Assertions.assertTrue(exception.getMessage().contains("Failed to parse JWT"));
-            Assertions.assertTrue(exception.getCause() instanceof io.jsonwebtoken.ExpiredJwtException);
+            Assertions.assertTrue(jwtUtil.parseJwt(expiredJwt).isEmpty(), "Expired token must not be valid");
         }
 
         @Test
@@ -141,7 +136,7 @@ class JwtUtilTest {
                     .signWith(privateKey, Jwts.SIG.RS256)
                     .compact();
 
-            Claims claims = jwtUtil.parseJwt(futureJwt);
+            Claims claims = jwtUtil.parseJwt(futureJwt).get();
             Assertions.assertNotNull(claims);
         }
     }
@@ -165,12 +160,8 @@ class JwtUtilTest {
                     .signWith(rogueKeyPair.getPrivate(), Jwts.SIG.RS256)
                     .compact();
 
-            RuntimeException exception =
-                    Assertions.assertThrows(RuntimeException.class, () -> jwtUtil.parseJwt(forgedToken));
-
             Assertions.assertTrue(
-                    exception.getCause() instanceof SignatureException,
-                    "Cause must be a SignatureException due to key mismatch");
+                    jwtUtil.parseJwt(forgedToken).isEmpty(), "Forged token must fail signature verification");
         }
 
         @Test
@@ -189,10 +180,8 @@ class JwtUtilTest {
 
             String tamperedJwt = header + "." + tamperedPayload + "." + signature;
 
-            Assertions.assertThrows(
-                    RuntimeException.class,
-                    () -> jwtUtil.parseJwt(tamperedJwt),
-                    "Tampered payload must fail signature verification");
+            Assertions.assertTrue(
+                    jwtUtil.parseJwt(tamperedJwt).isEmpty(), "Tampered payload must fail signature verification");
         }
 
         @Test
@@ -203,10 +192,8 @@ class JwtUtilTest {
 
             String unsignedJwt = noneHeader + "." + payload + ".";
 
-            Assertions.assertThrows(
-                    RuntimeException.class,
-                    () -> jwtUtil.parseJwt(unsignedJwt),
-                    "Unsigned tokens using 'none' algorithm must be rejected");
+            Assertions.assertTrue(
+                    jwtUtil.parseJwt(unsignedJwt).isEmpty(), "Unsigned tokens using 'none' algorithm must be rejected");
         }
     }
 
@@ -226,21 +213,21 @@ class JwtUtilTest {
                 })
         @DisplayName("Should fail when parsing invalid or malformed JWT formats")
         void testMalformedJwtInputs(String malformedJwt) {
-            Assertions.assertThrows(RuntimeException.class, () -> jwtUtil.parseJwt(malformedJwt));
+            Assertions.assertTrue(jwtUtil.parseJwt(malformedJwt).isEmpty());
         }
 
         @Test
         @DisplayName("Should handle null inputs gracefully")
         void testNullInputs() {
-            Assertions.assertThrows(RuntimeException.class, () -> jwtUtil.parseJwt(null));
-            Assertions.assertThrows(RuntimeException.class, () -> jwtUtil.generateJwt(null, 60000L, Map.of()));
+            Assertions.assertTrue(jwtUtil.parseJwt(null).isEmpty());
+            Assertions.assertTrue(jwtUtil.generateJwt("user-null", 60000L, null) != null);
         }
 
         @Test
         @DisplayName("Should handle empty claims map without throwing exceptions")
         void testEmptyClaimsMap() {
             String jwt = jwtUtil.generateJwt("user-empty-claims", 60000L, Map.of());
-            Claims claims = jwtUtil.parseJwt(jwt);
+            Claims claims = jwtUtil.parseJwt(jwt).get();
 
             Assertions.assertEquals("user-empty-claims", claims.getSubject());
             Assertions.assertNotNull(claims.getExpiration());
@@ -254,7 +241,7 @@ class JwtUtilTest {
                     "metadata", Map.of("ip", "127.0.0.1", "attempts", 3));
 
             String token = jwtUtil.generateJwt("complex-user", 60000L, complexClaims);
-            Claims claims = jwtUtil.parseJwt(token);
+            Claims claims = jwtUtil.parseJwt(token).get();
 
             @SuppressWarnings("unchecked")
             java.util.List<String> perms = claims.get("permissions", java.util.List.class);

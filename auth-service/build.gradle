@@ -1,14 +1,26 @@
 import java.security.KeyPairGenerator
 
 plugins {
-    id("java")
-    id("application")
+    id 'java'
+    id 'application'
     id 'com.diffplug.spotless' version '7.2.1'
     id 'checkstyle'
 }
 
 def targetArch = project.findProperty('targetArch') ?: 'linux-x86_64'
 def epollClassifier = (targetArch in ['linux-aarch_64', 'aarch64']) ? 'linux-aarch_64' : 'linux-x86_64'
+
+sourceSets {
+    e2eTest {
+        compileClasspath += sourceSets.main.output + sourceSets.test.output
+        runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+    }
+}
+
+configurations {
+    e2eTestImplementation.extendsFrom testImplementation
+    e2eTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
 
 dependencies {
     implementation platform(libs.netty.bom)
@@ -22,21 +34,31 @@ dependencies {
     testImplementation libs.bundles.testing.suite
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${libs.versions.junit.get()}"
     testRuntimeOnly libs.junit.platform.launcher
-    implementation(libs.jjwt.api)
-    runtimeOnly(libs.jjwt.impl)
-    runtimeOnly(libs.jjwt.jackson)
+
+    implementation libs.jjwt.api
+    runtimeOnly libs.jjwt.impl
+    runtimeOnly libs.jjwt.jackson
 
     implementation libs.snake.yaml
+    implementation libs.hikaricp
+    runtimeOnly libs.postgresql
+    implementation libs.h2.db
+
+    e2eTestImplementation libs.testcontainers.junit
+    e2eTestImplementation libs.testcontainers.postgres
+    e2eTestImplementation libs.testcontainers.core
+
+    implementation libs.bcrypt
 }
 
 application {
-    mainClass.set("Main")
+    mainClass = "Main"
     applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
 }
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(26))
+        languageVersion = JavaLanguageVersion.of(26)
     }
 }
 
@@ -44,11 +66,10 @@ repositories {
     mavenCentral()
 }
 
-tasks.test {
+tasks.withType(Test).configureEach {
     useJUnitPlatform()
-}
+    jvmArgs(['--enable-native-access=ALL-UNNAMED'])
 
-test {
     testLogging {
         events "passed", "skipped", "failed"
         showStandardStreams = false
@@ -57,15 +78,26 @@ test {
         showStackTraces = true
         exceptionFormat = 'full'
     }
+
     afterSuite { desc, result ->
         if (!desc.parent) {
-            println "\nTest Summary: ${result.resultType}"
-            println "  Passed: ${result.successfulTestCount}"
-            println "  Failed: ${result.failedTestCount}"
+            println "\n[${name}] Summary: ${result.resultType}"
+            println "  Passed:  ${result.successfulTestCount}"
+            println "  Failed:  ${result.failedTestCount}"
             println "  Skipped: ${result.skippedTestCount}"
             println "  Total:   ${result.testCount}\n"
         }
     }
+}
+
+tasks.register('e2eTest', Test) {
+    description = 'Runs the end-to-end tests.'
+    group = 'verification'
+
+    testClassesDirs = sourceSets.e2eTest.output.classesDirs
+    classpath = sourceSets.e2eTest.runtimeClasspath
+
+    shouldRunAfter tasks.named('test')
 }
 
 spotless {
@@ -80,13 +112,12 @@ checkstyle {
     configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
 }
 
-tasks.named('checkstyleMain') {
+tasks.withType(Checkstyle).configureEach {
     dependsOn 'spotlessApply'
 }
 
 tasks.named('check') {
-    dependsOn 'test'
-    dependsOn 'checkstyleMain'
+    dependsOn tasks.named('e2eTest')
 }
 
 tasks.register('generateDevRsaKeys') {

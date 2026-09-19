@@ -1,13 +1,25 @@
 [versions]
+bcrypt = "0.10.2"
 groovy = "3.0.5"
+hikari = "7.1.0"
+h2 = "2.5.250"
 jjwt = "0.13.0"
 junit = "5.7.1"
 netty = "4.2.18.Final"
+postgresql = "42.7.13"
 slf4j = "2.0.19"
 snake-yaml = "2.7"
+testcontainer = "2.0.5"
 
 [libraries]
+
+bcrypt = { module = "at.favre.lib:bcrypt", version.ref = "bcrypt" }
+
 groovy-core = { module = "org.codehaus.groovy:groovy", version.ref = "groovy" }
+
+hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
+
+h2-db = { module = "com.h2database:h2", version.ref = "h2" }
 
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
@@ -26,7 +38,13 @@ netty-common = { module = "io.netty:netty-common" }
 netty-codec = { module = "io.netty:netty-codec" }
 netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll" }
 
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+
 snake-yaml = { module = "org.yaml:snakeyaml", version.ref = "snake-yaml" }
+
+testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainer" }
+testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainer" }
+testcontainers-postgres = { module = "org.testcontainers:testcontainers-postgresql", version.ref = "testcontainer" }
 
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }

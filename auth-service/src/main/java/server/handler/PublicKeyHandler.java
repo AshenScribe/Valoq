@@ -10,8 +10,7 @@ public class PublicKeyHandler extends SimpleChannelInboundHandler<String> {
     protected void channelRead0(ChannelHandlerContext ctx, String msg) {
         if (msg.equals("PUBLIC_KEY"))
             ctx.writeAndFlush(Base64.getEncoder()
-                            .encodeToString(
-                                    KeyProvider.getInstance().getPublicKey().getEncoded()) + "\n");
+                    .encodeToString(KeyProvider.getInstance().getPublicKey().getEncoded()));
         else ctx.fireChannelRead(msg);
     }
 }
