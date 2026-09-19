@@ -49,6 +49,8 @@ dependencies {
     e2eTestImplementation libs.testcontainers.core
 
     implementation libs.bcrypt
+
+    implementation libs.jackson.databind
 }
 
 application {

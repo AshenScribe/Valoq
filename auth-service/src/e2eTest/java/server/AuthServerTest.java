@@ -117,4 +117,31 @@ class AuthServerTest extends BaseIntegrationTest {
             Assertions.assertTrue(response.startsWith("ERROR"));
         }
     }
+
+    @Test
+    @DisplayName("Should register over TCP, return valid JWT, and allow login over the same connection")
+    void testRegisterAndLoginOverNetty() throws Exception {
+        String username = "netty_registered_user";
+        String password = "SecurePassword99!";
+        String salt = "salt123";
+
+        try (AuthTestClient client = createClient()) {
+            String registerJwt = client.register(username, password, salt, "user@test.com");
+            Assertions.assertNotNull(registerJwt);
+            Assertions.assertTrue(JwtUtil.getInstance().parseJwt(registerJwt).isPresent());
+            String loginJwt = client.loginBasic(username, password, salt);
+            Assertions.assertNotNull(loginJwt);
+            Assertions.assertTrue(JwtUtil.getInstance().parseJwt(loginJwt).isPresent());
+        }
+    }
+
+    @Test
+    @DisplayName("Should return ERROR prefix over TCP when password fails validation")
+    void testRegisterWithWeakPasswordReturnsErrorOverNetty() throws Exception {
+        try (AuthTestClient client = createClient()) {
+            String response = client.register("valid_user", "weak", "salt", "test@test.com");
+            Assertions.assertTrue(response.startsWith("ERROR"));
+            Assertions.assertTrue(response.contains("Password is too short"));
+        }
+    }
 }

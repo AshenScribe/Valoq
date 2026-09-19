@@ -80,4 +80,13 @@ public class AuthTestClient implements AutoCloseable {
         if (channel != null) channel.close();
         group.shutdownGracefully();
     }
+
+    public String register(String username, String password, String salt, String email) {
+        String json = String.format(
+                "{\"username\":\"%s\",\"password\":\"%s\",\"salt\":\"%s\",\"email\":\"%s\"}",
+                username, password, salt, email);
+        String base64Payload =
+                java.util.Base64.getEncoder().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return send("AUTH REGISTER " + base64Payload);
+    }
 }

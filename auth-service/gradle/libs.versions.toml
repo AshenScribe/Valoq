@@ -3,6 +3,7 @@ bcrypt = "0.10.2"
 groovy = "3.0.5"
 hikari = "7.1.0"
 h2 = "2.5.250"
+jackson-databind = "2.22.2"
 jjwt = "0.13.0"
 junit = "5.7.1"
 netty = "4.2.18.Final"
@@ -20,6 +21,8 @@ groovy-core = { module = "org.codehaus.groovy:groovy", version.ref = "groovy" }
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
 
 h2-db = { module = "com.h2database:h2", version.ref = "h2" }
+
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson-databind" }
 
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }

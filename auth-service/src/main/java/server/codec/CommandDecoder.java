@@ -1,8 +1,11 @@
 package server.codec;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.MessageToMessageDecoder;
+import java.util.Base64;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,6 +21,8 @@ import server.command.TokenCommand;
 public class CommandDecoder extends MessageToMessageDecoder<String> {
 
     final Pattern AUTH_PATTERN = Pattern.compile("AUTH\\s(\\S+)\\s(\\S+)$");
+    private static final ObjectMapper OBJECT_MAPPER =
+            new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @Override
     protected void decode(ChannelHandlerContext ctx, String msg, List<Object> out) {
@@ -32,7 +37,14 @@ public class CommandDecoder extends MessageToMessageDecoder<String> {
                         String[] parts = matcher.group(2).split(":");
                         yield new BasicCommand(parts[0], parts[1], parts[2]);
                     }
-                    case "REGISTER" -> new RegisterCommand(matcher.group(2));
+                    case "REGISTER" -> {
+                        try {
+                            byte[] jsonBytes = Base64.getDecoder().decode(matcher.group(2));
+                            yield OBJECT_MAPPER.readValue(jsonBytes, RegisterCommand.class);
+                        } catch (Exception e) {
+                            throw new DecoderException("Invalid JSON payload for REGISTER command", e);
+                        }
+                    }
                     default -> throw new IllegalStateException(
                             String.format("invalid command type: %s\nExpected TOKEN/BASIC/REGISTER", matcher.group(1)));
                 };
