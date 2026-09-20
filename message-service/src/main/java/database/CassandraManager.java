@@ -24,8 +24,14 @@
 package database;
 
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.CqlSessionBuilder;
 import config.ServerConfig;
 import java.net.InetSocketAddress;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 public final class CassandraManager {
 
@@ -38,11 +44,43 @@ public final class CassandraManager {
             return;
         }
 
-        session = CqlSession.builder()
-                .addContactPoint(new InetSocketAddress(config.getContactPoint(), config.getPort()))
-                .withLocalDatacenter(config.getLocalDatacenter())
-                .withKeyspace(config.getKeyspace())
-                .build();
+        String host = config.getContactPoint() != null ? config.getContactPoint() : config.getHost();
+        String datacenter = config.getLocalDatacenter() != null ? config.getLocalDatacenter() : "datacenter1";
+
+        CqlSessionBuilder builder = CqlSession.builder()
+                .addContactPoint(new InetSocketAddress(host, config.getPort()))
+                .withLocalDatacenter(datacenter);
+
+        if (config.getKeyspace() != null && !config.getKeyspace().isBlank()) {
+            builder.withKeyspace(config.getKeyspace());
+        }
+
+        if (config.getUsername() != null && !config.getUsername().isBlank()) {
+            builder.withAuthCredentials(config.getUsername(), config.getPassword());
+        }
+
+        if (config.getSsl() != null && config.getSsl().isEnabled()) {
+            builder.withSslContext(createDevSslContext());
+        }
+
+        session = builder.build();
+    }
+
+    private static SSLContext createDevSslContext() {
+        try {
+            TrustManager[] trustAll = new TrustManager[] {
+                    new X509TrustManager() {
+                        public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+                        public void checkClientTrusted(X509Certificate[] certs, String authType) {}
+                        public void checkServerTrusted(X509Certificate[] certs, String authType) {}
+                    }
+            };
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, trustAll, new SecureRandom());
+            return sslContext;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize SSLContext for Cassandra", e);
+        }
     }
 
     public static CqlSession getSession() {

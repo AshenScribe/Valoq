@@ -10,3 +10,11 @@ CREATE TABLE IF NOT EXISTS valoq_messages.messages (
     created_at timestamp,
     PRIMARY KEY ((conversation_id), message_id)
 ) WITH CLUSTERING ORDER BY (message_id ASC);
+
+CREATE ROLE IF NOT EXISTS valoq_message_service
+WITH PASSWORD = 'message_service_password'
+AND LOGIN = true
+AND SUPERUSER = false;
+
+GRANT SELECT ON TABLE valoq_messages.messages TO valoq_message_service;
+GRANT MODIFY ON TABLE valoq_messages.messages TO valoq_message_service;

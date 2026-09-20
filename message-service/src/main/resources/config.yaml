@@ -1,6 +1,12 @@
+server:
+  port: 8002
+
 database:
   host: localhost
   port: 9042
-
-server:
-  port: 8001
+  keyspace: valoq_messages
+  localDatacenter: datacenter1
+  username: valoq_message_service
+  password: message_service_password
+  ssl:
+    enabled: true

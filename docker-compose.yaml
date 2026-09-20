@@ -11,9 +11,77 @@ services:
       POSTGRES_USER: valoq
       POSTGRES_PASSWORD: valoq_admin_password
     volumes:
-      - ./script/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     command: >
       postgres
         -c ssl=on
         -c ssl_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
         -c ssl_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
+
+  cassandra:
+    image: cassandra:5.0
+    container_name: valoq-cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: "ValoqCluster"
+      CASSANDRA_DC: "datacenter1"
+      SSL_VALIDATE: "false"
+      MAX_HEAP_SIZE: "1024M"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        # 1. Enable Password Authentication and Cassandra Authorization
+        sed -i 's/^authenticator: .*/authenticator: PasswordAuthenticator/' /etc/cassandra/cassandra.yaml
+        sed -i 's/^authorizer: .*/authorizer: CassandraAuthorizer/' /etc/cassandra/cassandra.yaml
+
+        # 2. Clean stale keystore and generate fresh self-signed PKCS12 keystore
+        rm -f /etc/cassandra/keystore.p12
+        keytool -genkeypair -alias cassandra -keyalg RSA -keysize 2048 \
+          -keystore /etc/cassandra/keystore.p12 -storetype PKCS12 \
+          -storepass cassandra -keypass cassandra -dname "CN=localhost" -noprompt
+
+        # 3. Replace client_encryption_options with valid 2-space YAML indentation
+        python3 -c '
+        path = "/etc/cassandra/cassandra.yaml"
+        with open(path, "r") as f:
+            lines = f.readlines()
+
+        new_lines = []
+        skip = False
+        for line in lines:
+            if line.startswith("client_encryption_options:"):
+                skip = True
+                continue
+            if skip and (line.startswith("  ") or line.strip() == ""):
+                continue
+            skip = False
+            new_lines.append(line)
+
+        # Append properly indented YAML block
+        ssl_block = (
+            "client_encryption_options:\n"
+            "  enabled: true\n"
+            "  optional: false\n"
+            "  keystore: /etc/cassandra/keystore.p12\n"
+            "  keystore_password: cassandra\n"
+            "  require_client_auth: false\n"
+        )
+        new_lines.append("\n" + ssl_block)
+
+        with open(path, "w") as f:
+            f.writelines(new_lines)
+        '
+
+        # 4. Configure local cqlsh to accept self-signed certificates
+        mkdir -p /root/.cassandra
+        printf "[ssl]\nvalidate = false\n" > /root/.cassandra/cqlshrc
+
+        exec docker-entrypoint.sh cassandra -f
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -u cassandra -p cassandra --ssl -e 'describe cluster' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 45s
