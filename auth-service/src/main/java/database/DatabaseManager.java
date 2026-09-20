@@ -36,19 +36,29 @@ public final class DatabaseManager {
     private DatabaseManager() {}
 
     public static synchronized void init(ServerConfig config) {
-        if (dataSource != null && !dataSource.isClosed()) {
+        if (dataSource != null && !dataSource.isClosed())
             return;
-        }
 
         HikariConfig hikariConfig = new HikariConfig();
 
-        String jdbcUrl = String.format(
-                "jdbc:postgresql://%s:%d/%s", config.databaseHost(), config.databasePort(), config.databaseName());
+        ServerConfig.DatabaseProps db = config.database();
+        String jdbcUrl = String.format("jdbc:postgresql://%s:%d/%s", db.host(), db.port(), db.name());
 
         hikariConfig.setJdbcUrl(jdbcUrl);
-        hikariConfig.setUsername(config.username());
-        hikariConfig.setPassword(config.password());
+        hikariConfig.setUsername(db.username());
+        hikariConfig.setPassword(db.password());
         hikariConfig.setDriverClassName("org.postgresql.Driver");
+
+        ServerConfig.DatabaseSslProps ssl = db.ssl();
+        String effectiveSslMode = (ssl != null && ssl.mode() != null && !ssl.mode().isBlank())
+                ? ssl.mode()
+                : db.sslMode();
+
+        if (effectiveSslMode != null && !effectiveSslMode.isBlank()) {
+            hikariConfig.addDataSourceProperty("sslmode", effectiveSslMode);
+            boolean isSslEnabled = !"disable".equalsIgnoreCase(effectiveSslMode);
+            hikariConfig.addDataSourceProperty("ssl", String.valueOf(isSslEnabled));
+        }
 
         hikariConfig.setMaximumPoolSize(10);
         hikariConfig.setMinimumIdle(2);

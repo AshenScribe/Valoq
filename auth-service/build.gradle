@@ -123,35 +123,4 @@ tasks.named('check') {
     dependsOn tasks.named('e2eTest')
 }
 
-tasks.register('generateDevRsaKeys') {
-    def outputDir = layout.buildDirectory.dir("generated/dev-keys")
-    outputs.dir(outputDir)
-
-    doLast {
-        def keyFolder = outputDir.get().asFile
-        if (!keyFolder.exists()) {
-            keyFolder.mkdirs()
-        }
-
-        def privateKeyFile = new File(keyFolder, "private.key")
-        def publicKeyFile = new File(keyFolder, "public.key")
-
-        if (!privateKeyFile.exists() || !publicKeyFile.exists()) {
-            println "Generating new dev RSA key pair..."
-            def keyPairGen = KeyPairGenerator.getInstance("RSA")
-            keyPairGen.initialize(2048)
-            def keyPair = keyPairGen.generateKeyPair()
-
-            privateKeyFile.text = Base64.encoder.encodeToString(keyPair.private.encoded)
-            publicKeyFile.text = Base64.encoder.encodeToString(keyPair.public.encoded)
-        }
-    }
-}
-
-sourceSets.main.resources {
-    srcDir layout.buildDirectory.dir("generated/dev-keys")
-}
-
-tasks.named('processResources') {
-    dependsOn tasks.named('generateDevRsaKeys')
-}
+apply from: 'gradle/dev-certs.gradle'

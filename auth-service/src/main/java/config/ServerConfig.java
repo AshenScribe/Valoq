@@ -24,89 +24,320 @@
 package config;
 
 public class ServerConfig {
-    private int serverPort;
-    private int databasePort;
-    private String databaseHost;
-    private String username;
-    private String password;
-    private String databaseName;
-    private String sslMode;
-    private String sslCertPath;
-    private String sslKeyPath;
-    private String sslRootCertPath;
-    private long jwtExpirationTime;
-
-    public void setServerPort(int serverPort) {
-        this.serverPort = serverPort;
-    }
-
-    public void setDatabasePort(int databasePort) {
-        this.databasePort = databasePort;
-    }
-
-    public void setDatabaseHost(String databaseHost) {
-        this.databaseHost = databaseHost;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public void setDatabaseName(String databaseName) {
-        this.databaseName = databaseName;
-    }
-
-    public void setJwtExpirationTime(long jwtExpirationTime) {
-        this.jwtExpirationTime = jwtExpirationTime;
-    }
+    private ServerProps server = new ServerProps();
+    private DatabaseProps database = new DatabaseProps();
+    private JwtProps jwt = new JwtProps();
 
     public ServerConfig() {}
 
-    public int serverPort() {
-        return serverPort;
+    public ServerProps server() {
+        return server;
     }
 
-    public int databasePort() {
-        return databasePort;
+    public ServerProps getServer() {
+        return server;
     }
 
-    public String databaseHost() {
-        return databaseHost;
+    public void setServer(ServerProps server) {
+        this.server = server;
     }
 
-    public String username() {
-        return username;
+    public DatabaseProps database() {
+        return database;
     }
 
-    public String password() {
-        return password;
+    public DatabaseProps getDatabase() {
+        return database;
     }
 
-    public String databaseName() {
-        return databaseName;
+    public void setDatabase(DatabaseProps database) {
+        this.database = database;
     }
 
-    public String sslMode() {
-        return sslMode;
+    public JwtProps jwt() {
+        return jwt;
     }
 
-    public String sslCertPath() {
-        return sslCertPath;
+    public JwtProps getJwt() {
+        return jwt;
     }
 
-    public String sslKeyPath() {
-        return sslKeyPath;
+    public void setJwt(JwtProps jwt) {
+        this.jwt = jwt;
     }
 
-    public String sslRootCertPath() {
-        return sslRootCertPath;
+    public static class ServerProps {
+        private String host = "localhost";
+        private int port = 8001;
+        private ServerSslProps ssl = new ServerSslProps();
+
+        public String host() {
+            return host;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        public void setHost(String host) {
+            this.host = host;
+        }
+
+        public int port() {
+            return port;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public void setPort(int port) {
+            this.port = port;
+        }
+
+        public ServerSslProps ssl() {
+            return ssl;
+        }
+
+        public ServerSslProps getSsl() {
+            return ssl;
+        }
+
+        public void setSsl(ServerSslProps ssl) {
+            this.ssl = ssl;
+        }
     }
 
-    public long jwtExpirationTime() {
-        return jwtExpirationTime;
+    public static class ServerSslProps {
+        private boolean enabled = false;
+        private String certChainPath;
+        private String privateKeyPath;
+        private String keyPassword;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public boolean enabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String certChainPath() {
+            return certChainPath;
+        }
+
+        public String getCertChainPath() {
+            return certChainPath;
+        }
+
+        public void setCertChainPath(String certChainPath) {
+            this.certChainPath = certChainPath;
+        }
+
+        public String privateKeyPath() {
+            return privateKeyPath;
+        }
+
+        public String getPrivateKeyPath() {
+            return privateKeyPath;
+        }
+
+        public void setPrivateKeyPath(String privateKeyPath) {
+            this.privateKeyPath = privateKeyPath;
+        }
+
+        public String keyPassword() {
+            return keyPassword;
+        }
+
+        public String getKeyPassword() {
+            return keyPassword;
+        }
+
+        public void setKeyPassword(String keyPassword) {
+            this.keyPassword = keyPassword;
+        }
+    }
+
+    public static class DatabaseProps {
+        private String host = "localhost";
+        private int port = 5432;
+        private String name = "valoq";
+        private String username = "valoq";
+        private String password = "valoq";
+        private String sslMode = "disable";
+        private DatabaseSslProps ssl = new DatabaseSslProps();
+
+        public String host() {
+            return host;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        public void setHost(String host) {
+            this.host = host;
+        }
+
+        public int port() {
+            return port;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public void setPort(int port) {
+            this.port = port;
+        }
+
+        public String name() {
+            return name;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String username() {
+            return username;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String password() {
+            return password;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+
+        public String sslMode() {
+            return sslMode;
+        }
+
+        public String getSslMode() {
+            return sslMode;
+        }
+
+        public void setSslMode(String sslMode) {
+            this.sslMode = sslMode;
+        }
+
+        public DatabaseSslProps ssl() {
+            return ssl;
+        }
+
+        public DatabaseSslProps getSsl() {
+            return ssl;
+        }
+
+        public void setSsl(DatabaseSslProps ssl) {
+            this.ssl = ssl;
+        }
+    }
+
+    public static class DatabaseSslProps {
+        private String mode = "disable";
+        private String certPath;
+        private String keyPath;
+        private String rootCertPath;
+        private String keyPassword;
+
+        public String mode() {
+            return mode;
+        }
+
+        public String getMode() {
+            return mode;
+        }
+
+        public void setMode(String mode) {
+            this.mode = mode;
+        }
+
+        public String certPath() {
+            return certPath;
+        }
+
+        public String getCertPath() {
+            return certPath;
+        }
+
+        public void setCertPath(String certPath) {
+            this.certPath = certPath;
+        }
+
+        public String keyPath() {
+            return keyPath;
+        }
+
+        public String getKeyPath() {
+            return keyPath;
+        }
+
+        public void setKeyPath(String keyPath) {
+            this.keyPath = keyPath;
+        }
+
+        public String rootCertPath() {
+            return rootCertPath;
+        }
+
+        public String getRootCertPath() {
+            return rootCertPath;
+        }
+
+        public void setRootCertPath(String rootCertPath) {
+            this.rootCertPath = rootCertPath;
+        }
+
+        public String keyPassword() {
+            return keyPassword;
+        }
+
+        public String getKeyPassword() {
+            return keyPassword;
+        }
+
+        public void setKeyPassword(String keyPassword) {
+            this.keyPassword = keyPassword;
+        }
+    }
+
+    public static class JwtProps {
+        private long expirationSeconds = 300;
+
+        public long expirationSeconds() {
+            return expirationSeconds;
+        }
+
+        public long getExpirationSeconds() {
+            return expirationSeconds;
+        }
+
+        public void setExpirationSeconds(long expirationSeconds) {
+            this.expirationSeconds = expirationSeconds;
+        }
     }
 }

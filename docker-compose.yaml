@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: valoq-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: valoq
+      POSTGRES_USER: valoq
+      POSTGRES_PASSWORD: valoq_admin_password
+    volumes:
+      - ./script/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command: >
+      postgres
+        -c ssl=on
+        -c ssl_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
+        -c ssl_key_file=/etc/ssl/private/ssl-cert-snakeoil.key

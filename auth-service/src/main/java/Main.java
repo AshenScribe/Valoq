@@ -31,10 +31,10 @@ public final class Main {
 
     private Main() {}
 
-    static void main() throws InterruptedException {
+    public static void main() throws InterruptedException {
         ServerConfig appConfig = new ConfigLoader().appConfig();
         DatabaseManager.init(appConfig);
-        JwtUtil.getInstance(appConfig.jwtExpirationTime());
+        JwtUtil.getInstance(appConfig.jwt().expirationSeconds());
         AuthServer server = new AuthServer(appConfig);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             server.stop();

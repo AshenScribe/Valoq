@@ -39,7 +39,7 @@ import server.AuthServer;
 
 public abstract class BaseIntegrationTest {
 
-    protected static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:15.3")
+    protected static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:15")
             .withDatabaseName("testdb")
             .withUsername("testuser")
             .withPassword("testpass")
@@ -56,16 +56,18 @@ public abstract class BaseIntegrationTest {
         }
 
         config = new ServerConfig();
-        config.setDatabaseHost(postgres.getHost());
-        config.setDatabasePort(postgres.getFirstMappedPort());
-        config.setDatabaseName(postgres.getDatabaseName());
-        config.setUsername(postgres.getUsername());
-        config.setPassword(postgres.getPassword());
-        config.setServerPort(0);
-        config.setJwtExpirationTime(3600);
+        config.database().setHost(postgres.getHost());
+        config.database().setPort(postgres.getFirstMappedPort());
+        config.database().setName(postgres.getDatabaseName());
+        config.database().setUsername(postgres.getUsername());
+        config.database().setPassword(postgres.getPassword());
+        config.database().ssl().setMode("disable");
+
+        config.server().setPort(0);
+        config.jwt().setExpirationSeconds(3600);
 
         DatabaseManager.init(config);
-        JwtUtil.getInstance(config.jwtExpirationTime());
+        JwtUtil.getInstance(config.jwt().expirationSeconds());
 
         server = new AuthServer(config);
         server.start();

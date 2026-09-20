@@ -3,6 +3,9 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Valoq.iml" filepath="$PROJECT_DIR$/.idea/Valoq.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/auth-service.e2eTest.iml" filepath="$PROJECT_DIR$/.idea/modules/auth-service.e2eTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/message-service.e2eTest.iml" filepath="$PROJECT_DIR$/.idea/modules/message-service.e2eTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/message-service.main.iml" filepath="$PROJECT_DIR$/.idea/modules/message-service.main.iml" />
     </modules>
   </component>
 </project>

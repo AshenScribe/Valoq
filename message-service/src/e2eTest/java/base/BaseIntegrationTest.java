@@ -37,7 +37,7 @@ import server.MessageServer;
 public abstract class BaseIntegrationTest {
 
     protected static final CassandraContainer cassandra =
-            new CassandraContainer("cassandra:4.1").withInitScript("init.cql");
+            new CassandraContainer("cassandra:5.0").withInitScript("init.cql");
 
     protected static ServerConfig serverConfig;
     protected static MessageServer server;

@@ -44,11 +44,11 @@ public class PostgresDatabase {
 
     public static ServerConfig getServerConfig() {
         ServerConfig serverConfig = new ServerConfig();
-        serverConfig.setDatabaseHost(container.getHost());
-        serverConfig.setDatabasePort(container.getFirstMappedPort());
-        serverConfig.setDatabaseName(container.getDatabaseName());
-        serverConfig.setUsername(container.getUsername());
-        serverConfig.setPassword(container.getPassword());
+        serverConfig.database().host();
+        serverConfig.database().setPort(container.getFirstMappedPort());
+        serverConfig.database().setName(container.getDatabaseName());
+        serverConfig.database().setUsername(container.getUsername());
+        serverConfig.database().setPassword(container.getPassword());
         return serverConfig;
     }
 

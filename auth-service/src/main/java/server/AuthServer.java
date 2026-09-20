@@ -53,7 +53,7 @@ public class AuthServer {
     private Channel channelFuture;
 
     public AuthServer(ServerConfig serverConfig) {
-        this.port = serverConfig.serverPort();
+        this.port = serverConfig.server().port();
         final IoHandlerFactory handler = Epoll.isAvailable() ? EpollIoHandler.newFactory() : NioIoHandler.newFactory();
         this.bossGroup = new MultiThreadIoEventLoopGroup(handler);
         this.workerGroup = new MultiThreadIoEventLoopGroup(handler);

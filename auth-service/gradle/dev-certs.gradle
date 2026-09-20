@@ -1,0 +1,33 @@
+import java.security.KeyPairGenerator
+
+def devKeysDir = layout.buildDirectory.dir("generated/dev-keys")
+
+tasks.register('generateDevRsaKeys') {
+    outputs.dir(devKeysDir)
+
+    doLast {
+        def folder = devKeysDir.get().asFile
+        folder.mkdirs()
+
+        def privateKeyFile = new File(folder, "private.key")
+        def publicKeyFile = new File(folder, "public.key")
+
+        if (!privateKeyFile.exists() || !publicKeyFile.exists()) {
+            println "Generating dev JWT RSA key pair..."
+            def keyPairGen = KeyPairGenerator.getInstance("RSA")
+            keyPairGen.initialize(2048)
+            def keyPair = keyPairGen.generateKeyPair()
+
+            privateKeyFile.text = Base64.encoder.encodeToString(keyPair.private.encoded)
+            publicKeyFile.text = Base64.encoder.encodeToString(keyPair.public.encoded)
+        }
+    }
+}
+
+sourceSets.main.resources {
+    srcDir devKeysDir
+}
+
+tasks.named('processResources') {
+    dependsOn tasks.named('generateDevRsaKeys')
+}
