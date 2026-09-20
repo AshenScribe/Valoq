@@ -29,10 +29,10 @@ This protocol facilitates simple authenticated messaging between clients connect
 *   **Can `SEND` happen before `INIT`?**
     *   **No.** The pipeline is designed such that `ChatMessageHandler` is only added after a successful `INIT`. If a client attempts to `SEND` before `INIT`, the server is still running `InitVerbHandler`, which will reject the `SEND` command as `INVALID` and close the connection.
 
-*   **What happens with duplicate user IDs?**
+*   **What happens with duplicate userEntity IDs?**
     *   **Last-Writer-Wins.** When a new connection performs an `INIT` with an existing `userId`, the `ConnectionTracker` updates the mapping to point to the new `Channel`. The old connection remains open (but orphaned), and the new connection becomes the active recipient for that `userId`.
 
-*   **Maximum user ID length?**
+*   **Maximum userEntity ID length?**
     *   **64 characters.** As enforced by the `SEND` pattern regex `[^\\s]{1,64}`.
 
 *   **Is payload maximum length?**

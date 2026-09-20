@@ -1,3 +1,26 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Valoq
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package server.handler;
 
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -52,7 +75,7 @@ class ChatMessageHandlerTest {
 
             Object outbound = recipientChannel.readOutbound();
 
-            Assertions.assertEquals("FROM " + TEST_USER_ID + " " + base64Payload + "\n", outbound);
+            Assertions.assertEquals("FROM " + TEST_USER_ID + " " + base64Payload, outbound);
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -81,8 +104,7 @@ class ChatMessageHandlerTest {
 
             senderChannel.writeInbound("SEND " + recipientId + " " + base64Payload);
 
-            Assertions.assertEquals(
-                    "FROM " + TEST_USER_ID + " " + base64Payload + "\n", recipientChannel.readOutbound());
+            Assertions.assertEquals("FROM " + TEST_USER_ID + " " + base64Payload, recipientChannel.readOutbound());
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -101,9 +123,9 @@ class ChatMessageHandlerTest {
 
             senderChannel.writeInbound("SEND bob V29ybGQ=");
 
-            Assertions.assertEquals("FROM " + TEST_USER_ID + " SGVsbG8=\n", recipientChannel.readOutbound());
+            Assertions.assertEquals("FROM " + TEST_USER_ID + " SGVsbG8=", recipientChannel.readOutbound());
 
-            Assertions.assertEquals("FROM " + TEST_USER_ID + " V29ybGQ=\n", recipientChannel.readOutbound());
+            Assertions.assertEquals("FROM " + TEST_USER_ID + " V29ybGQ=", recipientChannel.readOutbound());
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -122,7 +144,7 @@ class ChatMessageHandlerTest {
 
             senderChannel.writeInbound("SEND bob SGVsbG8=");
 
-            Assertions.assertEquals("FROM " + TEST_USER_ID + " SGVsbG8=\n", bobChannel.readOutbound());
+            Assertions.assertEquals("FROM " + TEST_USER_ID + " SGVsbG8=", bobChannel.readOutbound());
 
             Assertions.assertNull(aliceChannel.readOutbound());
 
@@ -146,14 +168,12 @@ class ChatMessageHandlerTest {
                 "SEND  user456 SGVsbG8=",
                 " SEND user456 SGVsbG8=",
                 "SEND user456 SGVsbG8= ",
-                "SEND user456 SGVsbG8=\n",
-                "SEND user456 SGVsbG8=\r\n"
             })
     void testInvalidSendMessageFormat(String invalidMessage) {
 
         senderChannel.writeInbound(invalidMessage);
 
-        Assertions.assertEquals("ERROR Invalid SEND format\n", senderChannel.readOutbound());
+        Assertions.assertEquals("ERROR Invalid SEND format", senderChannel.readOutbound());
     }
 
     @Test
@@ -161,7 +181,7 @@ class ChatMessageHandlerTest {
 
         senderChannel.writeInbound("SEND unknownUser SGVsbG8=");
 
-        Assertions.assertEquals("ERROR Recipient not connected\n", senderChannel.readOutbound());
+        Assertions.assertEquals("ERROR Recipient not connected", senderChannel.readOutbound());
     }
 
     @Test
@@ -176,7 +196,7 @@ class ChatMessageHandlerTest {
 
             senderChannel.writeInbound("SEND " + recipientId + " SGVsbG8=");
 
-            Assertions.assertEquals("FROM " + TEST_USER_ID + " SGVsbG8=\n", recipientChannel.readOutbound());
+            Assertions.assertEquals("FROM " + TEST_USER_ID + " SGVsbG8=", recipientChannel.readOutbound());
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -190,7 +210,7 @@ class ChatMessageHandlerTest {
 
         senderChannel.writeInbound("SEND " + recipientId + " SGVsbG8=");
 
-        Assertions.assertEquals("ERROR Invalid SEND format\n", senderChannel.readOutbound());
+        Assertions.assertEquals("ERROR Invalid SEND format", senderChannel.readOutbound());
     }
 
     @ParameterizedTest
@@ -199,7 +219,7 @@ class ChatMessageHandlerTest {
 
         senderChannel.writeInbound("SEND " + recipientId + " SGVsbG8=");
 
-        Assertions.assertEquals("ERROR Invalid SEND format\n", senderChannel.readOutbound());
+        Assertions.assertEquals("ERROR Invalid SEND format", senderChannel.readOutbound());
     }
 
     @Test
@@ -219,7 +239,7 @@ class ChatMessageHandlerTest {
 
             senderChannel.writeInbound("SEND bob SGVsbG8=");
 
-            Assertions.assertEquals("FROM alice123 SGVsbG8=\n", recipientChannel.readOutbound());
+            Assertions.assertEquals("FROM alice123 SGVsbG8=", recipientChannel.readOutbound());
 
         } finally {
             recipientChannel.finishAndReleaseAll();

@@ -21,16 +21,19 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package server;
+package config;
 
-public class Session {
-    private String userId;
+import java.io.InputStream;
+import org.yaml.snakeyaml.Yaml;
 
-    public String getUserId() {
-        return userId;
-    }
+public class ConfigLoader {
 
-    public void setUserId(String userId) {
-        this.userId = userId;
+    public ServerConfig appConfig() {
+        Yaml yaml = new Yaml();
+
+        InputStream inputStream = getClass().getClassLoader().getResourceAsStream("config.yaml");
+
+        if (inputStream == null) throw new IllegalStateException("config.yaml not found");
+        return yaml.loadAs(inputStream, ServerConfig.class);
     }
 }

@@ -1,10 +1,14 @@
 [versions]
+cassandra-driver = "4.19.3"
 groovy = "3.0.5"
 junit = "5.7.1"
 netty = "4.2.18.Final"
 slf4j = "2.0.19"
+snake-yaml = "2.7"
+testcontainer = "2.0.5"
 
 [libraries]
+cassandra-driver = { module = "org.apache.cassandra:java-driver-core", version.ref = "cassandra-driver" }
 groovy-core = { module = "org.codehaus.groovy:groovy", version.ref = "groovy" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
@@ -17,8 +21,15 @@ netty-transport = { module = "io.netty:netty-transport" }
 netty-common = { module = "io.netty:netty-common" }
 netty-codec = { module = "io.netty:netty-codec" }
 netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll" }
+
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+
+snake-yaml = { module = "org.yaml:snakeyaml", version.ref = "snake-yaml" }
+
+testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainer" }
+testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainer" }
+testcontainers-cassandra = { module = "org.testcontainers:testcontainers-cassandra", version.ref = "testcontainer" }
 
 [bundles]
 testing-suite = ["groovy-core", "junit-jupiter-api", "junit-jupiter-engine", "junit-jupiter-params"]

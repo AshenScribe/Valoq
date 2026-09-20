@@ -1,0 +1,6 @@
+database:
+  host: localhost
+  port: 9042
+
+server:
+  port: 8001

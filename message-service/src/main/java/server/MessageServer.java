@@ -1,5 +1,30 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Valoq
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package server;
 
+import config.ServerConfig;
+import database.CassandraManager;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -14,6 +39,8 @@ import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LineBasedFrameDecoder;
+import io.netty.handler.codec.string.LineEncoder;
+import io.netty.handler.codec.string.LineSeparator;
 import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.AttributeKey;
@@ -36,8 +63,8 @@ public class MessageServer {
     private final Class<? extends ServerChannel> channelClass =
             Epoll.isAvailable() ? EpollServerSocketChannel.class : NioServerSocketChannel.class;
 
-    public MessageServer(int port) {
-        this.port = port;
+    public MessageServer(ServerConfig serverConfig) {
+        this.port = serverConfig.getServer().getPort();
     }
 
     public synchronized void start() throws InterruptedException {
@@ -61,6 +88,7 @@ public class MessageServer {
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
         }
+        CassandraManager.close();
     }
 
     ConnectionTracker getConnectionTracker() {
@@ -74,23 +102,31 @@ public class MessageServer {
     public static class MessageServerInitializer extends ChannelInitializer<Channel> {
 
         public static final AttributeKey<Session> SESSION_KEY = AttributeKey.newInstance("session");
-        private final ConnectionTracker CONNECTION_TRACKER;
+        private final ConnectionTracker connectionTracker;
+        private final MessageRouter messageRouter;
 
         public MessageServerInitializer(ConnectionTracker connectionTracker) {
-            super();
-            this.CONNECTION_TRACKER = connectionTracker;
+            this(
+                    connectionTracker,
+                    new MessageRouter(
+                            connectionTracker,
+                            CassandraManager.isInitialized() ? new database.MessageRepository() : null));
+        }
+
+        public MessageServerInitializer(ConnectionTracker connectionTracker, MessageRouter messageRouter) {
+            this.connectionTracker = connectionTracker;
+            this.messageRouter = messageRouter;
         }
 
         @Override
         protected void initChannel(Channel ch) {
             ch.attr(SESSION_KEY).set(new Session());
-            ch.pipeline()
-                    .addLast("stringEncoder", new io.netty.handler.codec.string.StringEncoder(StandardCharsets.UTF_8));
+            ch.pipeline().addLast("lineEncoder", new LineEncoder(LineSeparator.UNIX, StandardCharsets.UTF_8));
             ch.pipeline().addLast("lineBasedFrameDecoder", new LineBasedFrameDecoder(1024));
             ch.pipeline().addLast("stringDecoder", new StringDecoder(StandardCharsets.UTF_8));
             ch.pipeline().addLast("logger", new LoggingHandler());
-            ch.pipeline().addLast("initVerbHandler", new InitVerbHandler(CONNECTION_TRACKER));
-            ch.pipeline().addLast("connectionLifecycleHandler", new ConnectionLifecycleHandler(CONNECTION_TRACKER));
+            ch.pipeline().addLast("initVerbHandler", new InitVerbHandler(connectionTracker, messageRouter));
+            ch.pipeline().addLast("connectionLifecycleHandler", new ConnectionLifecycleHandler(connectionTracker));
         }
     }
 }
