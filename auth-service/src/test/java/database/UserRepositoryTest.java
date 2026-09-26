@@ -79,7 +79,8 @@ class UserRepositoryEdgeCasesTest {
         @ParameterizedTest
         @NullAndEmptySource
         @ValueSource(strings = {"   ", "\t", "\n"})
-        @DisplayName("Should return null or handle gracefully for null, empty, or whitespace-only usernames")
+        @DisplayName(
+                "Should return null or handle gracefully for null, empty, or whitespace-only usernames")
         void getUser_handlesNullOrBlankInput(String inputUsername) {
             UserEntity user = userRepository.getUser(inputUsername);
             Assertions.assertNull(user);
@@ -93,7 +94,8 @@ class UserRepositoryEdgeCasesTest {
             String injectionQuery = "' OR '1'='1";
             UserEntity user = userRepository.getUser(injectionQuery);
 
-            Assertions.assertNull(user, "SQL Injection payload must not execute or return a record");
+            Assertions.assertNull(
+                    user, "SQL Injection payload must not execute or return a record");
         }
 
         @Test
@@ -106,7 +108,8 @@ class UserRepositoryEdgeCasesTest {
 
             Assertions.assertNotNull(exactMatch);
             Assertions.assertNull(
-                    lowercaseMatch, "Username lookup should strictly follow expected database casing rules");
+                    lowercaseMatch,
+                    "Username lookup should strictly follow expected database casing rules");
         }
 
         @Test
@@ -148,7 +151,8 @@ class UserRepositoryEdgeCasesTest {
         }
 
         @Test
-        @DisplayName("Should extract first record if database uniquely violates and contains duplicates")
+        @DisplayName(
+                "Should extract first record if database uniquely violates and contains duplicates")
         void getUser_handlesMultipleMatchingRecords() throws SQLException {
             try (Statement stmt = connection.createStatement()) {
                 stmt.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS CONSTRAINT_BA");
@@ -172,11 +176,15 @@ class UserRepositoryEdgeCasesTest {
             UserEntity user = userRepository.getUser("duplicate_user");
 
             Assertions.assertNotNull(user);
-            Assertions.assertEquals("user-1", user.userId(), "Should consistently retrieve the first matching record");
+            Assertions.assertEquals(
+                    "user-1",
+                    user.userId(),
+                    "Should consistently retrieve the first matching record");
         }
 
         @Test
-        @DisplayName("Should throw RuntimeException if DB schema drops a required column (e.g., SELECT * drift)")
+        @DisplayName(
+                "Should throw RuntimeException if DB schema drops a required column (e.g., SELECT * drift)")
         void getUser_throwsException_whenRequiredColumnIsMissing() throws SQLException {
             try (Statement stmt = connection.createStatement()) {
                 stmt.execute("DROP TABLE users");
@@ -195,7 +203,8 @@ class UserRepositoryEdgeCasesTest {
             insertUserWithoutSalt("user-1", "john_doe", "hash", "john@test.com");
 
             RuntimeException exception =
-                    Assertions.assertThrows(RuntimeException.class, () -> userRepository.getUser("john_doe"));
+                    Assertions.assertThrows(
+                            RuntimeException.class, () -> userRepository.getUser("john_doe"));
             Assertions.assertTrue(exception.getCause() instanceof SQLException);
         }
     }
@@ -205,11 +214,14 @@ class UserRepositoryEdgeCasesTest {
     class ConnectionFailureTests {
 
         @Test
-        @DisplayName("Should throw RuntimeException when database connection is closed prior to query execution")
-        void getUser_throwsException_whenConnectionClosed() throws SQLException, InterruptedException {
+        @DisplayName(
+                "Should throw RuntimeException when database connection is closed prior to query execution")
+        void getUser_throwsException_whenConnectionClosed()
+                throws SQLException, InterruptedException {
             connection.close();
             RuntimeException exception =
-                    Assertions.assertThrows(RuntimeException.class, () -> userRepository.getUser("john_doe"));
+                    Assertions.assertThrows(
+                            RuntimeException.class, () -> userRepository.getUser("john_doe"));
             Assertions.assertTrue(exception.getCause() instanceof SQLException);
         }
 
@@ -218,12 +230,15 @@ class UserRepositoryEdgeCasesTest {
         void getUser_throwsException_whenQueryFailsOrTimesOut() throws SQLException {
             connection.close();
 
-            Assertions.assertThrows(RuntimeException.class, () -> userRepository.getUser("john_doe"));
+            Assertions.assertThrows(
+                    RuntimeException.class, () -> userRepository.getUser("john_doe"));
         }
     }
 
-    private void insertUser(String id, String username, String hash, String salt, String email) throws SQLException {
-        String sql = "INSERT INTO users (user_id, username, password_hash, salt, email) VALUES (?, ?, ?, ?, ?)";
+    private void insertUser(String id, String username, String hash, String salt, String email)
+            throws SQLException {
+        String sql =
+                "INSERT INTO users (user_id, username, password_hash, salt, email) VALUES (?, ?, ?, ?, ?)";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, id);
             pstmt.setString(2, username);
@@ -234,8 +249,10 @@ class UserRepositoryEdgeCasesTest {
         }
     }
 
-    private void insertUserWithoutSalt(String id, String username, String hash, String email) throws SQLException {
-        String sql = "INSERT INTO users (user_id, username, password_hash, email) VALUES (?, ?, ?, ?)";
+    private void insertUserWithoutSalt(String id, String username, String hash, String email)
+            throws SQLException {
+        String sql =
+                "INSERT INTO users (user_id, username, password_hash, email) VALUES (?, ?, ?, ?)";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, id);
             pstmt.setString(2, username);

@@ -86,11 +86,12 @@ public final class JwtUtil {
 
     public Optional<Claims> parseJwt(String jwt) {
         try {
-            return Optional.of(Jwts.parser()
-                    .verifyWith(publicKey)
-                    .build()
-                    .parseSignedClaims(jwt)
-                    .getPayload());
+            return Optional.of(
+                    Jwts.parser()
+                            .verifyWith(publicKey)
+                            .build()
+                            .parseSignedClaims(jwt)
+                            .getPayload());
         } catch (Exception e) {
             return Optional.empty();
         }

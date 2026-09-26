@@ -55,7 +55,7 @@ public class MessageServer {
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
 
-    private final ConnectionTracker CONNECTION_TRACKER = new ConnectionTracker();
+    private final ConnectionTracker connectionTracker = new ConnectionTracker();
 
     private final IoHandlerFactory factory =
             Epoll.isAvailable() ? EpollIoHandler.newFactory() : NioIoHandler.newFactory();
@@ -64,18 +64,19 @@ public class MessageServer {
             Epoll.isAvailable() ? EpollServerSocketChannel.class : NioServerSocketChannel.class;
 
     public MessageServer(ServerConfig serverConfig) {
-        this.port = serverConfig.getServer().getPort();
+        this.port = serverConfig.serverPort();
     }
 
     public synchronized void start() throws InterruptedException {
         bossGroup = new MultiThreadIoEventLoopGroup(1, factory);
         workerGroup = new MultiThreadIoEventLoopGroup(factory);
 
-        ServerBootstrap bootstrap = new ServerBootstrap()
-                .group(bossGroup, workerGroup)
-                .channel(channelClass)
-                .childOption(ChannelOption.SO_KEEPALIVE, true)
-                .childHandler(new MessageServerInitializer(CONNECTION_TRACKER));
+        ServerBootstrap bootstrap =
+                new ServerBootstrap()
+                        .group(bossGroup, workerGroup)
+                        .channel(channelClass)
+                        .childOption(ChannelOption.SO_KEEPALIVE, true)
+                        .childHandler(new MessageServerInitializer(connectionTracker));
 
         channel = bootstrap.bind(port).sync().channel();
     }
@@ -92,7 +93,7 @@ public class MessageServer {
     }
 
     ConnectionTracker getConnectionTracker() {
-        return CONNECTION_TRACKER;
+        return connectionTracker;
     }
 
     public int getPort() {
@@ -110,10 +111,13 @@ public class MessageServer {
                     connectionTracker,
                     new MessageRouter(
                             connectionTracker,
-                            CassandraManager.isInitialized() ? new database.MessageRepository() : null));
+                            CassandraManager.isInitialized()
+                                    ? new database.MessageRepository()
+                                    : null));
         }
 
-        public MessageServerInitializer(ConnectionTracker connectionTracker, MessageRouter messageRouter) {
+        public MessageServerInitializer(
+                ConnectionTracker connectionTracker, MessageRouter messageRouter) {
             this.connectionTracker = connectionTracker;
             this.messageRouter = messageRouter;
         }
@@ -121,12 +125,21 @@ public class MessageServer {
         @Override
         protected void initChannel(Channel ch) {
             ch.attr(SESSION_KEY).set(new Session());
-            ch.pipeline().addLast("lineEncoder", new LineEncoder(LineSeparator.UNIX, StandardCharsets.UTF_8));
+            ch.pipeline()
+                    .addLast(
+                            "lineEncoder",
+                            new LineEncoder(LineSeparator.UNIX, StandardCharsets.UTF_8));
             ch.pipeline().addLast("lineBasedFrameDecoder", new LineBasedFrameDecoder(1024));
             ch.pipeline().addLast("stringDecoder", new StringDecoder(StandardCharsets.UTF_8));
             ch.pipeline().addLast("logger", new LoggingHandler());
-            ch.pipeline().addLast("initVerbHandler", new InitVerbHandler(connectionTracker, messageRouter));
-            ch.pipeline().addLast("connectionLifecycleHandler", new ConnectionLifecycleHandler(connectionTracker));
+            ch.pipeline()
+                    .addLast(
+                            "initVerbHandler",
+                            new InitVerbHandler(connectionTracker, messageRouter));
+            ch.pipeline()
+                    .addLast(
+                            "connectionLifecycleHandler",
+                            new ConnectionLifecycleHandler(connectionTracker));
         }
     }
 }

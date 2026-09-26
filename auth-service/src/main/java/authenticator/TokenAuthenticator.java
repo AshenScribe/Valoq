@@ -35,11 +35,12 @@ public class TokenAuthenticator implements Authenticator {
         JwtUtil jwtUtil = JwtUtil.getInstance();
 
         return jwtUtil.parseJwt(tokenCommand.token())
-                .map(claims -> {
-                    if (claims.getExpiration().before(new Date()))
-                        return jwtUtil.generateJwt(claims.getSubject(), claims);
-                    return tokenCommand.token();
-                })
+                .map(
+                        claims -> {
+                            if (claims.getExpiration().before(new Date()))
+                                return jwtUtil.generateJwt(claims.getSubject(), claims);
+                            return tokenCommand.token();
+                        })
                 .orElse(tokenCommand.token());
     }
 }

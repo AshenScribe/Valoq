@@ -28,46 +28,64 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.Row;
 import config.ServerConfig;
 import database.CassandraManager;
+import java.security.KeyPair;
+import java.util.Map;
+import org.aeonbits.owner.ConfigFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.cassandra.CassandraContainer;
 import server.MessageServer;
+import server.TestKeyManager;
 
 public abstract class BaseIntegrationTest {
 
-    protected static final CassandraContainer cassandra =
-            new CassandraContainer("cassandra:5.0").withInitScript("init.cql");
+    protected static final CassandraContainer CASSANDRA_CONTAINER =
+            new CassandraContainer("cassandra:5.0")
+                    .withConfigurationOverride("cassandra-auth")
+                    .withInitScript("init.cql")
+                    .withCreateContainerCmdModifier(
+                            cmd -> cmd.withName("cassandra-integration-test"));
 
-    protected static ServerConfig serverConfig;
-    protected static MessageServer server;
-    protected static int serverPort;
-    protected static CqlSession session;
+    private static MessageServer server;
+    private static CqlSession session;
+
+    private static int serverPort;
+
+    private static KeyPair keyPair;
 
     @BeforeAll
     static void startInfrastructure() throws Exception {
-        if (!cassandra.isRunning()) {
-            cassandra.start();
+        java.security.KeyPairGenerator generator =
+                java.security.KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048);
+        keyPair = TestKeyManager.getKeyPair();
+        String publicKeyBase64 =
+                java.util.Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded());
+        jwt.JwtUtil.getInstance().init(publicKeyBase64);
+
+        if (!CASSANDRA_CONTAINER.isRunning()) {
+            CASSANDRA_CONTAINER.start();
         }
 
-        ServerConfig.DatabaseConfig cassandraConfig = new ServerConfig.DatabaseConfig();
-        cassandraConfig.setContactPoint(cassandra.getHost());
-        cassandraConfig.setPort(cassandra.getFirstMappedPort());
-        cassandraConfig.setLocalDatacenter(cassandra.getLocalDatacenter());
-        cassandraConfig.setKeyspace("valoq_messages");
-        CassandraManager.init(cassandraConfig);
+        Map<String, String> testProps =
+                Map.of(
+                        "DB_HOST",
+                        CASSANDRA_CONTAINER.getHost(),
+                        "DB_PORT",
+                        String.valueOf(CASSANDRA_CONTAINER.getFirstMappedPort()),
+                        "DB_LOCAL_DATACENTER",
+                        CASSANDRA_CONTAINER.getLocalDatacenter(),
+                        "DB_KEYSPACE",
+                        "valoq_messages",
+                        "DB_SSL_ENABLED",
+                        "false",
+                        "PORT",
+                        "0");
+        ServerConfig serverConfig = ConfigFactory.create(ServerConfig.class, testProps);
+
+        CassandraManager.init(serverConfig);
         session = CassandraManager.getSession();
-
-        serverConfig = new ServerConfig();
-
-        ServerConfig.ServerSettings serverSettings = new ServerConfig.ServerSettings();
-        serverSettings.setPort(0);
-        serverConfig.setServer(serverSettings);
-
-        ServerConfig.DatabaseConfig dbConfig = new ServerConfig.DatabaseConfig();
-        dbConfig.setHost(cassandra.getHost());
-        dbConfig.setPort(cassandra.getFirstMappedPort());
-        serverConfig.setDatabase(dbConfig);
 
         server = new MessageServer(serverConfig);
         server.start();
@@ -90,7 +108,7 @@ public abstract class BaseIntegrationTest {
     }
 
     protected MessageTestClient connect() throws InterruptedException {
-        return new MessageTestClient("127.0.0.1", serverPort);
+        return new MessageTestClient("127.0.0.1", serverPort, keyPair.getPrivate());
     }
 
     protected Row awaitRow(String cqlQuery) throws InterruptedException {
@@ -103,5 +121,13 @@ public abstract class BaseIntegrationTest {
             Thread.sleep(50);
         }
         return null;
+    }
+
+    public static MessageServer getServer() {
+        return server;
+    }
+
+    public static CqlSession getSession() {
+        return session;
     }
 }

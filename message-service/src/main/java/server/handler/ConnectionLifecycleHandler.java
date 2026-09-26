@@ -40,9 +40,8 @@ public class ConnectionLifecycleHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
 
-        Session session = ctx.channel()
-                .attr(MessageServer.MessageServerInitializer.SESSION_KEY)
-                .get();
+        Session session =
+                ctx.channel().attr(MessageServer.MessageServerInitializer.SESSION_KEY).get();
 
         if (session != null && session.getUserId() != null) {
             connectionTracker.unregister(session.getUserId(), ctx.channel());

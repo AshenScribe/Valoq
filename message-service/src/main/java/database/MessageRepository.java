@@ -41,19 +41,22 @@ public class MessageRepository {
 
     public MessageRepository(CqlSession session) {
         this.session = session;
-        this.insertStatement = session.prepare(
-                """
-            INSERT INTO messages (conversation_id, message_id, sender_id, recipient_id, payload, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """);
+        this.insertStatement =
+                session.prepare(
+                        """
+                    INSERT INTO messages (conversation_id, message_id, sender_id, recipient_id, payload, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """);
     }
 
-    public CompletionStage<AsyncResultSet> saveMessageAsync(String senderId, String recipientId, String payload) {
+    public CompletionStage<AsyncResultSet> saveMessageAsync(
+            String senderId, String recipientId, String payload) {
         String conversationId = getConversationId(senderId, recipientId);
         Instant now = Instant.now();
 
         return session.executeAsync(
-                insertStatement.bind(conversationId, Uuids.timeBased(), senderId, recipientId, payload, now));
+                insertStatement.bind(
+                        conversationId, Uuids.timeBased(), senderId, recipientId, payload, now));
     }
 
     public static String getConversationId(String user1, String user2) {

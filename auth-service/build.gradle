@@ -60,7 +60,7 @@ application {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(26)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
@@ -104,7 +104,7 @@ tasks.register('e2eTest', Test) {
 
 spotless {
     java {
-        palantirJavaFormat()
+        googleJavaFormat('1.30.0').aosp()
         removeUnusedImports()
         licenseHeaderFile rootProject.file('LICENSE_HEADER')
     }
@@ -124,3 +124,5 @@ tasks.named('check') {
 }
 
 apply from: 'gradle/dev-certs.gradle'
+
+dependencyLocking { lockAllConfigurations() }

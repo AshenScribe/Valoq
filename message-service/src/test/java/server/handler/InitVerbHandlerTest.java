@@ -25,20 +25,39 @@ package server.handler;
 
 import io.netty.channel.DefaultChannelId;
 import io.netty.channel.embedded.EmbeddedChannel;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.util.Base64;
+import jwt.JwtUtil;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import server.ConnectionTracker;
 import server.MessageServer;
 import server.Session;
+import server.TestKeyManager;
 
 class InitVerbHandlerTest {
 
+    private static KeyPair keyPair;
     private EmbeddedChannel channel;
     private Session session;
     private final ConnectionTracker connectionTracker = new ConnectionTracker();
+
+    @BeforeAll
+    static void initJwtKey() throws Exception {
+        keyPair = TestKeyManager.getKeyPair();
+
+        String publicKeyBase64 =
+                Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded());
+        JwtUtil.getInstance().init(publicKeyBase64);
+    }
 
     @BeforeEach
     void setUp() {
@@ -48,30 +67,75 @@ class InitVerbHandlerTest {
         channel.pipeline().addLast(new InitVerbHandler(connectionTracker));
     }
 
-    @ParameterizedTest
-    @CsvSource({
-        "INIT abc, abc",
-        "INIT user123, user123",
-        "INIT 12345, 12345",
-        "INIT user_1, user_1",
-        "'INIT user-with-dashes', user-with-dashes",
-        "'INIT abc\r\n', abc"
-    })
-    public void successOnCorrect(String input, String expectedUserId) {
-        channel.writeInbound(input);
-        Assertions.assertEquals("SUCCESS", channel.readOutbound()); // <-- No \n
+    @Test
+    public void successOnValidJwtToken() throws Exception {
+        String expectedUserId = "user123";
+        String validJwt =
+                createJwtToken("{\"sub\":\"" + expectedUserId + "\"}", keyPair.getPrivate());
+
+        channel.writeInbound("INIT " + validJwt);
+
+        Assertions.assertEquals("SUCCESS", channel.readOutbound());
         Assertions.assertEquals(expectedUserId, session.getUserId());
         Assertions.assertTrue(channel.isOpen());
         Assertions.assertEquals(channel, connectionTracker.get(expectedUserId));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"INIT", "INIT ", "START abc", "init abc", "INIT a b c", "FOO", "", "   ", "INIT \t abc"})
-    public void failOnIncorrect(String input) {
-        channel.writeInbound(input);
-        Assertions.assertEquals("INVALID", channel.readOutbound()); // <-- No \n
+    @Test
+    public void failOnInvalidJwtSignature() throws Exception {
+        KeyPair wrongKeyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+        String invalidJwt = createJwtToken("{\"sub\":\"user123\"}", wrongKeyPair.getPrivate());
+
+        channel.writeInbound("INIT " + invalidJwt);
+
+        Assertions.assertEquals("INVALID", channel.readOutbound());
         Assertions.assertNull(session.getUserId());
         Assertions.assertFalse(channel.isOpen());
         Assertions.assertEquals(0, connectionTracker.getSize());
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "INIT",
+                "INIT ",
+                "START abc",
+                "init abc",
+                "FOO",
+                "",
+                "   ",
+                "INIT malformed.jwt.token"
+            })
+    public void failOnIncorrectFormatOrBadToken(String input) {
+        channel.writeInbound(input);
+
+        Assertions.assertEquals("INVALID", channel.readOutbound());
+        Assertions.assertNull(session.getUserId());
+        Assertions.assertFalse(channel.isOpen());
+        Assertions.assertEquals(0, connectionTracker.getSize());
+    }
+
+    private static String createJwtToken(String jsonPayload, PrivateKey privateKey)
+            throws Exception {
+        String header =
+                Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString(
+                                "{\"alg\":\"RS256\",\"typ\":\"JWT\"}"
+                                        .getBytes(StandardCharsets.UTF_8));
+        String payload =
+                Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString(jsonPayload.getBytes(StandardCharsets.UTF_8));
+
+        String contentToSign = header + "." + payload;
+
+        Signature signature = Signature.getInstance("SHA256withRSA");
+        signature.initSign(privateKey);
+        signature.update(contentToSign.getBytes(StandardCharsets.UTF_8));
+
+        String sigBase64 = Base64.getUrlEncoder().withoutPadding().encodeToString(signature.sign());
+
+        return contentToSign + "." + sigBase64;
     }
 }

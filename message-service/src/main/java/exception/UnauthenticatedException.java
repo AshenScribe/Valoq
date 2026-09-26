@@ -21,26 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-import config.ConfigLoader;
-import config.ServerConfig;
-import database.CassandraManager;
-import server.MessageServer;
+package exception;
 
-public final class Main {
-
-    private Main() {
-        throw new UnsupportedOperationException("Utility class should not be instantiated");
-    }
-
-    public static void main() throws InterruptedException {
-        ServerConfig config = new ConfigLoader().appConfig();
-        MessageServer server = new MessageServer(config);
-        CassandraManager.init(config.getDatabase());
-        try {
-            server.start();
-        } catch (InterruptedException e) {
-            server.stop();
-            throw e;
-        }
+public class UnauthenticatedException extends RuntimeException {
+    public UnauthenticatedException(String message) {
+        super(message);
     }
 }

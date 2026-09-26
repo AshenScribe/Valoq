@@ -50,12 +50,17 @@ class BasicAuthenticatorTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should successfully authenticate valid credentials and issue parseable JWT")
     void login_ValidCredentials_ReturnsValidJwt() {
-        String token = basicAuthenticator.login(
-                new BasicCommand(defaultUser.username(), defaultUser.passwordHash(), defaultUser.salt()));
+        String token =
+                basicAuthenticator.login(
+                        new BasicCommand(
+                                defaultUser.username(),
+                                defaultUser.passwordHash(),
+                                defaultUser.salt()));
 
         Assertions.assertNotNull(token, "JWT token should not be null");
         Assertions.assertTrue(
-                JwtUtil.getInstance().parseJwt(token).isPresent(), "Generated JWT should be parseable and valid");
+                JwtUtil.getInstance().parseJwt(token).isPresent(),
+                "Generated JWT should be parseable and valid");
     }
 
     @Test
@@ -63,8 +68,10 @@ class BasicAuthenticatorTest extends BaseIntegrationTest {
     void login_MultipleUsersInDb_AuthenticatesCorrectTargetUser() throws SQLException {
         User otherUser = users().createUser("otheruser", "otherhash", "othersalt");
 
-        String token = basicAuthenticator.login(
-                new BasicCommand(otherUser.username(), otherUser.passwordHash(), otherUser.salt()));
+        String token =
+                basicAuthenticator.login(
+                        new BasicCommand(
+                                otherUser.username(), otherUser.passwordHash(), otherUser.salt()));
 
         Assertions.assertTrue(JwtUtil.getInstance().parseJwt(token).isPresent());
     }
@@ -72,9 +79,15 @@ class BasicAuthenticatorTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should fail authentication when username does not exist")
     void login_NonExistentUsername_ThrowsUserNotFoundException() {
-        UserNotFoundException ex = Assertions.assertThrows(
-                UserNotFoundException.class,
-                () -> basicAuthenticator.login(new BasicCommand("non_existent_user", "testpasswordhash", "testsalt")));
+        UserNotFoundException ex =
+                Assertions.assertThrows(
+                        UserNotFoundException.class,
+                        () ->
+                                basicAuthenticator.login(
+                                        new BasicCommand(
+                                                "non_existent_user",
+                                                "testpasswordhash",
+                                                "testsalt")));
 
         Assertions.assertEquals("User with username non_existent_user not found", ex.getMessage());
     }
@@ -82,12 +95,19 @@ class BasicAuthenticatorTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should fail authentication when password hash is incorrect")
     void login_IncorrectPassword_ThrowsUserNotFoundException() {
-        UserNotFoundException ex = Assertions.assertThrows(
-                UserNotFoundException.class,
-                () -> basicAuthenticator.login(
-                        new BasicCommand(defaultUser.username(), "wrong_password_hash", defaultUser.salt())));
+        UserNotFoundException ex =
+                Assertions.assertThrows(
+                        UserNotFoundException.class,
+                        () ->
+                                basicAuthenticator.login(
+                                        new BasicCommand(
+                                                defaultUser.username(),
+                                                "wrong_password_hash",
+                                                defaultUser.salt())));
 
-        Assertions.assertEquals("User with username testuser not found or password does not match", ex.getMessage());
+        Assertions.assertEquals(
+                "User with username testuser not found or password does not match",
+                ex.getMessage());
     }
 
     @ParameterizedTest
@@ -97,7 +117,9 @@ class BasicAuthenticatorTest extends BaseIntegrationTest {
     void login_NullOrBlankUsername_ThrowsUserNotFoundException(String invalidUsername) {
         Assertions.assertThrows(
                 UserNotFoundException.class,
-                () -> basicAuthenticator.login(new BasicCommand(invalidUsername, "testpasswordhash", "testsalt")));
+                () ->
+                        basicAuthenticator.login(
+                                new BasicCommand(invalidUsername, "testpasswordhash", "testsalt")));
     }
 
     @ParameterizedTest
@@ -107,7 +129,8 @@ class BasicAuthenticatorTest extends BaseIntegrationTest {
         "testuser, TESTPASSWORDHASH, testsalt"
     })
     @DisplayName("Should enforce case sensitivity on credentials")
-    void login_CaseMismatch_ThrowsUserNotFoundException(String username, String passwordHash, String salt) {
+    void login_CaseMismatch_ThrowsUserNotFoundException(
+            String username, String passwordHash, String salt) {
         Assertions.assertThrows(
                 UserNotFoundException.class,
                 () -> basicAuthenticator.login(new BasicCommand(username, passwordHash, salt)));

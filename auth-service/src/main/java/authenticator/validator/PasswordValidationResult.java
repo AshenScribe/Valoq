@@ -30,7 +30,8 @@ public enum PasswordValidationResult {
     INVALID_NO_UPPERCASE("Password must contain at least one uppercase letter"),
     INVALID_NO_LOWERCASE("Password must contain at least one lowercase letter"),
     INVALID_NO_NUMBER("Password must contain at least one number"),
-    INVALID_NO_SPECIAL_CHARACTER("Password must contain at least one special character (!@#$%^&*()-_+=<>?)");
+    INVALID_NO_SPECIAL_CHARACTER(
+            "Password must contain at least one special character (!@#$%^&*()-_+=<>?)");
 
     private final String message;
 

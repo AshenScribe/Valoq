@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: org.apache.cassandra:java-driver-guava-shaded:4.19.3" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="org.apache.cassandra" artifactId="java-driver-guava-shaded" version="4.19.3" baseVersion="4.19.3" />
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../.gradle/caches/modules-2/files-2.1/org.apache.cassandra/java-driver-guava-shaded/4.19.3/614958182f816d20315c90a2b09be169504cf5ad/java-driver-guava-shaded-4.19.3.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/../.gradle/caches/modules-2/files-2.1/org.apache.cassandra/java-driver-guava-shaded/4.19.3/e848382073bd6299e7f88ef190b04865feca2d08/java-driver-guava-shaded-4.19.3-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

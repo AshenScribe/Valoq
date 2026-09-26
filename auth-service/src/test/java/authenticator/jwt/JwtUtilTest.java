@@ -55,13 +55,18 @@ class JwtUtilTest {
     static void ensureDevKeysExistAndLoad() {
         String privStr;
 
-        try (InputStream privStream = JwtUtilTest.class.getClassLoader().getResourceAsStream("private.key");
-                InputStream pubStream = JwtUtilTest.class.getClassLoader().getResourceAsStream("public.key")) {
+        try (InputStream privStream =
+                        JwtUtilTest.class.getClassLoader().getResourceAsStream("private.key");
+                InputStream pubStream =
+                        JwtUtilTest.class.getClassLoader().getResourceAsStream("public.key")) {
 
             if (privStream == null || pubStream == null) {
-                throw new IllegalStateException("Dev keys missing! Run ./gradlew generateDevRsaKeys");
+                throw new IllegalStateException(
+                        "Dev keys missing! Run ./gradlew generateDevRsaKeys");
             }
-            privStr = new String(privStream.readAllBytes(), StandardCharsets.UTF_8).replaceAll("\\s+", "");
+            privStr =
+                    new String(privStream.readAllBytes(), StandardCharsets.UTF_8)
+                            .replaceAll("\\s+", "");
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read dev key files from classpath", e);
         }
@@ -104,13 +109,14 @@ class JwtUtilTest {
             Date now = new Date();
             Date expiry = new Date(now.getTime() + 60000);
 
-            String jwt = Jwts.builder()
-                    .subject(expectedSubject)
-                    .claim("role", expectedRole)
-                    .issuedAt(now)
-                    .expiration(expiry)
-                    .signWith(privateKey, Jwts.SIG.RS256)
-                    .compact();
+            String jwt =
+                    Jwts.builder()
+                            .subject(expectedSubject)
+                            .claim("role", expectedRole)
+                            .issuedAt(now)
+                            .expiration(expiry)
+                            .signWith(privateKey, Jwts.SIG.RS256)
+                            .compact();
 
             Claims claims = jwtUtil.parseJwt(jwt).get();
             Assertions.assertNotNull(claims);
@@ -137,14 +143,16 @@ class JwtUtilTest {
             Date past = new Date(System.currentTimeMillis() - 50000);
             Date expiredAt = new Date(System.currentTimeMillis() - 10000);
 
-            String expiredJwt = Jwts.builder()
-                    .subject("user-expired")
-                    .issuedAt(past)
-                    .expiration(expiredAt)
-                    .signWith(privateKey, Jwts.SIG.RS256)
-                    .compact();
+            String expiredJwt =
+                    Jwts.builder()
+                            .subject("user-expired")
+                            .issuedAt(past)
+                            .expiration(expiredAt)
+                            .signWith(privateKey, Jwts.SIG.RS256)
+                            .compact();
 
-            Assertions.assertTrue(jwtUtil.parseJwt(expiredJwt).isEmpty(), "Expired token must not be valid");
+            Assertions.assertTrue(
+                    jwtUtil.parseJwt(expiredJwt).isEmpty(), "Expired token must not be valid");
         }
 
         @Test
@@ -152,12 +160,13 @@ class JwtUtilTest {
         void testFutureIssuedTokenRejection() {
             Date futureTime = new Date(System.currentTimeMillis() + 100000);
 
-            String futureJwt = Jwts.builder()
-                    .subject("future-user")
-                    .issuedAt(futureTime)
-                    .expiration(new Date(futureTime.getTime() + 60000))
-                    .signWith(privateKey, Jwts.SIG.RS256)
-                    .compact();
+            String futureJwt =
+                    Jwts.builder()
+                            .subject("future-user")
+                            .issuedAt(futureTime)
+                            .expiration(new Date(futureTime.getTime() + 60000))
+                            .signWith(privateKey, Jwts.SIG.RS256)
+                            .compact();
 
             Claims claims = jwtUtil.parseJwt(futureJwt).get();
             Assertions.assertNotNull(claims);
@@ -175,16 +184,18 @@ class JwtUtilTest {
             kpg.initialize(2048);
             KeyPair rogueKeyPair = kpg.generateKeyPair();
 
-            String forgedToken = Jwts.builder()
-                    .subject("hacker-user")
-                    .claim("role", "SUPERADMIN")
-                    .issuedAt(new Date())
-                    .expiration(new Date(System.currentTimeMillis() + 60000))
-                    .signWith(rogueKeyPair.getPrivate(), Jwts.SIG.RS256)
-                    .compact();
+            String forgedToken =
+                    Jwts.builder()
+                            .subject("hacker-user")
+                            .claim("role", "SUPERADMIN")
+                            .issuedAt(new Date())
+                            .expiration(new Date(System.currentTimeMillis() + 60000))
+                            .signWith(rogueKeyPair.getPrivate(), Jwts.SIG.RS256)
+                            .compact();
 
             Assertions.assertTrue(
-                    jwtUtil.parseJwt(forgedToken).isEmpty(), "Forged token must fail signature verification");
+                    jwtUtil.parseJwt(forgedToken).isEmpty(),
+                    "Forged token must fail signature verification");
         }
 
         @Test
@@ -197,14 +208,18 @@ class JwtUtilTest {
             String payload = parts[1];
             String signature = parts[2];
 
-            String tamperedPayload = Base64.getUrlEncoder()
-                    .encodeToString("{\"sub\":\"user-1\",\"role\":\"ADMIN\"}".getBytes(StandardCharsets.UTF_8))
-                    .replace("=", "");
+            String tamperedPayload =
+                    Base64.getUrlEncoder()
+                            .encodeToString(
+                                    "{\"sub\":\"user-1\",\"role\":\"ADMIN\"}"
+                                            .getBytes(StandardCharsets.UTF_8))
+                            .replace("=", "");
 
             String tamperedJwt = header + "." + tamperedPayload + "." + signature;
 
             Assertions.assertTrue(
-                    jwtUtil.parseJwt(tamperedJwt).isEmpty(), "Tampered payload must fail signature verification");
+                    jwtUtil.parseJwt(tamperedJwt).isEmpty(),
+                    "Tampered payload must fail signature verification");
         }
 
         @Test
@@ -216,7 +231,8 @@ class JwtUtilTest {
             String unsignedJwt = noneHeader + "." + payload + ".";
 
             Assertions.assertTrue(
-                    jwtUtil.parseJwt(unsignedJwt).isEmpty(), "Unsigned tokens using 'none' algorithm must be rejected");
+                    jwtUtil.parseJwt(unsignedJwt).isEmpty(),
+                    "Unsigned tokens using 'none' algorithm must be rejected");
         }
     }
 
@@ -259,9 +275,10 @@ class JwtUtilTest {
         @Test
         @DisplayName("Should handle complex nested claims structures")
         void testNestedComplexClaims() {
-            Map<String, Object> complexClaims = Map.of(
-                    "permissions", java.util.List.of("READ", "WRITE", "DELETE"),
-                    "metadata", Map.of("ip", "127.0.0.1", "attempts", 3));
+            Map<String, Object> complexClaims =
+                    Map.of(
+                            "permissions", java.util.List.of("READ", "WRITE", "DELETE"),
+                            "metadata", Map.of("ip", "127.0.0.1", "attempts", 3));
 
             String token = jwtUtil.generateJwt("complex-user", 60000L, complexClaims);
             Claims claims = jwtUtil.parseJwt(token).get();

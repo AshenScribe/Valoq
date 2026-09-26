@@ -46,7 +46,7 @@ class MessageRepositoryTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        messageRepository = new MessageRepository(session);
+        messageRepository = new MessageRepository(getSession());
     }
 
     @Nested
@@ -54,22 +54,26 @@ class MessageRepositoryTest extends BaseIntegrationTest {
     class SingleMessageTests {
 
         @Test
-        @DisplayName("Should successfully insert message asynchronously and verify all columns in Cassandra")
-        void saveMessageAsync_SuccessfullyPersistsMessage() throws Exception {
+        @DisplayName(
+                "Should successfully insert message asynchronously and verify all columns in Cassandra")
+        void saveMessageAsyncSuccessfullyPersistsMessage() throws Exception {
             String sender = "usr_alice";
             String recipient = "usr_bob";
             String payload = "SGVsbG8gQm9iIQ==";
             Instant beforeInsert = Instant.now().minusSeconds(1);
 
-            AsyncResultSet asyncResult = messageRepository
-                    .saveMessageAsync(sender, recipient, payload)
-                    .toCompletableFuture()
-                    .get(5, TimeUnit.SECONDS);
+            AsyncResultSet asyncResult =
+                    messageRepository
+                            .saveMessageAsync(sender, recipient, payload)
+                            .toCompletableFuture()
+                            .get(5, TimeUnit.SECONDS);
 
             Assertions.assertTrue(asyncResult.wasApplied(), "Insert statement must be applied");
-            String cql = "SELECT conversation_id, message_id, sender_id, recipient_id, payload, created_at "
-                    + "FROM valoq_messages.messages WHERE conversation_id = ?;";
-            ResultSet rs = session.execute(session.prepare(cql).bind("usr_alice:usr_bob"));
+            String cql =
+                    "SELECT conversation_id, message_id, sender_id, recipient_id, payload, created_at "
+                            + "FROM valoq_messages.messages WHERE conversation_id = ?;";
+            ResultSet rs =
+                    getSession().execute(getSession().prepare(cql).bind("usr_alice:usr_bob"));
             Row row = rs.one();
 
             Assertions.assertNotNull(row, "Row must be found in Cassandra");
@@ -87,7 +91,7 @@ class MessageRepositoryTest extends BaseIntegrationTest {
 
         @Test
         @DisplayName("Should preserve large Base64 payloads without truncation")
-        void saveMessageAsync_LargePayload_StoredAccurately() throws Exception {
+        void saveMessageAsyncLargePayloadStoredAccurately() throws Exception {
             String largePayload = "A".repeat(64 * 1024);
 
             messageRepository
@@ -96,7 +100,9 @@ class MessageRepositoryTest extends BaseIntegrationTest {
                     .get(5, TimeUnit.SECONDS);
 
             ResultSet rs =
-                    session.execute("SELECT payload FROM valoq_messages.messages WHERE conversation_id = 'alice:bob';");
+                    getSession()
+                            .execute(
+                                    "SELECT payload FROM valoq_messages.messages WHERE conversation_id = 'alice:bob';");
             Row row = rs.one();
 
             Assertions.assertNotNull(row);
@@ -111,7 +117,7 @@ class MessageRepositoryTest extends BaseIntegrationTest {
         @Test
         @DisplayName(
                 "Bidirectional messages (Alice->Bob and Bob->Alice) must share the same partition and maintain chronological clustering order")
-        void saveMessageAsync_BidirectionalMessagesShareSamePartition() throws Exception {
+        void saveMessageAsyncBidirectionalMessagesShareSamePartition() throws Exception {
             messageRepository
                     .saveMessageAsync("alice", "bob", "msg_1")
                     .toCompletableFuture()
@@ -124,10 +130,11 @@ class MessageRepositoryTest extends BaseIntegrationTest {
                     .get(5, TimeUnit.SECONDS);
             String cql =
                     "SELECT sender_id, recipient_id, payload FROM valoq_messages.messages WHERE conversation_id = ?;";
-            ResultSet rs = session.execute(session.prepare(cql).bind("alice:bob"));
+            ResultSet rs = getSession().execute(getSession().prepare(cql).bind("alice:bob"));
             List<Row> rows = rs.all();
 
-            Assertions.assertEquals(2, rows.size(), "Both messages must exist in the shared partition");
+            Assertions.assertEquals(
+                    2, rows.size(), "Both messages must exist in the shared partition");
             Assertions.assertEquals("alice", rows.get(0).getString("sender_id"));
             Assertions.assertEquals("msg_1", rows.get(0).getString("payload"));
 
@@ -137,7 +144,7 @@ class MessageRepositoryTest extends BaseIntegrationTest {
 
         @Test
         @DisplayName("Different conversations must be stored in completely isolated partitions")
-        void saveMessageAsync_DistinctConversationsAreIsolated() throws Exception {
+        void saveMessageAsyncDistinctConversationsAreIsolated() throws Exception {
             messageRepository
                     .saveMessageAsync("alice", "bob", "for_bob")
                     .toCompletableFuture()
@@ -148,12 +155,16 @@ class MessageRepositoryTest extends BaseIntegrationTest {
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
             ResultSet rsBob =
-                    session.execute("SELECT payload FROM valoq_messages.messages WHERE conversation_id = 'alice:bob';");
+                    getSession()
+                            .execute(
+                                    "SELECT payload FROM valoq_messages.messages WHERE conversation_id = 'alice:bob';");
             List<Row> bobRows = rsBob.all();
             Assertions.assertEquals(1, bobRows.size());
             Assertions.assertEquals("for_bob", bobRows.get(0).getString("payload"));
-            ResultSet rsCharlie = session.execute(
-                    "SELECT payload FROM valoq_messages.messages WHERE conversation_id = 'alice:charlie';");
+            ResultSet rsCharlie =
+                    getSession()
+                            .execute(
+                                    "SELECT payload FROM valoq_messages.messages WHERE conversation_id = 'alice:charlie';");
             List<Row> charlieRows = rsCharlie.all();
             Assertions.assertEquals(1, charlieRows.size());
             Assertions.assertEquals("for_charlie", charlieRows.get(0).getString("payload"));
@@ -167,9 +178,12 @@ class MessageRepositoryTest extends BaseIntegrationTest {
             "user_2, user_10, user_10:user_2",
             "same_user, same_user, same_user:same_user"
         })
-        @DisplayName("getConversationId should produce deterministic keys regardless of argument order")
-        void getConversationId_IsDeterministic(String user1, String user2, String expectedConversationId) {
-            Assertions.assertEquals(expectedConversationId, MessageRepository.getConversationId(user1, user2));
+        @DisplayName(
+                "getConversationId should produce deterministic keys regardless of argument order")
+        void getConversationIdIsDeterministic(
+                String user1, String user2, String expectedConversationId) {
+            Assertions.assertEquals(
+                    expectedConversationId, MessageRepository.getConversationId(user1, user2));
         }
     }
 
@@ -178,25 +192,31 @@ class MessageRepositoryTest extends BaseIntegrationTest {
     class ConcurrencyTests {
 
         @Test
-        @DisplayName("Should handle 30 simultaneous asynchronous inserts without dropped writes or race conditions")
-        void saveMessageAsync_ConcurrentInserts_AllPersisted() {
+        @DisplayName(
+                "Should handle 30 simultaneous asynchronous inserts without dropped writes or race conditions")
+        void saveMessageAsyncConcurrentInsertsAllPersisted() {
             int messageCount = 30;
             List<CompletableFuture<AsyncResultSet>> futures = new ArrayList<>();
 
             for (int i = 0; i < messageCount; i++) {
                 final int idx = i;
-                CompletableFuture<AsyncResultSet> future = messageRepository
-                        .saveMessageAsync("alice", "bob", "payload_" + idx)
-                        .toCompletableFuture();
+                CompletableFuture<AsyncResultSet> future =
+                        messageRepository
+                                .saveMessageAsync("alice", "bob", "payload_" + idx)
+                                .toCompletableFuture();
                 futures.add(future);
             }
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-            ResultSet rs = session.execute(
-                    "SELECT count(*) FROM valoq_messages.messages WHERE conversation_id = 'alice:bob';");
+            ResultSet rs =
+                    getSession()
+                            .execute(
+                                    "SELECT count(*) FROM valoq_messages.messages WHERE conversation_id = 'alice:bob';");
             Row countRow = rs.one();
             Assertions.assertNotNull(countRow);
             Assertions.assertEquals(
-                    messageCount, countRow.getLong(0), "All 30 messages must be committed to Cassandra");
+                    messageCount,
+                    countRow.getLong(0),
+                    "All 30 messages must be committed to Cassandra");
         }
     }
 }

@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: io.netty:netty-resolver:4.2.18.Final" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="io.netty" artifactId="netty-resolver" version="4.2.18.Final" baseVersion="4.2.18.Final" />
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../.gradle/caches/modules-2/files-2.1/io.netty/netty-resolver/4.2.18.Final/9d21e01c476a1f92b9dc07d968d2a02810b2fba1/netty-resolver-4.2.18.Final.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/../.gradle/caches/modules-2/files-2.1/io.netty/netty-resolver/4.2.18.Final/b84d33b2e162f1d6ebbffa93bb4d2bc0a698b855/netty-resolver-4.2.18.Final-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

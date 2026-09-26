@@ -37,19 +37,27 @@ public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthComma
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, AuthCommand msg) {
         CompletableFuture.supplyAsync(
-                        () -> AuthenticationHandlerFactory.getAuthenticationHandler(msg)
-                                .login(msg),
+                        () -> AuthenticationHandlerFactory.getAuthenticationHandler(msg).login(msg),
                         AUTH_WORKERS)
-                .thenAccept(token -> {
-                    ctx.channel().eventLoop().execute(() -> {
-                        ctx.writeAndFlush(token);
-                    });
-                })
-                .exceptionally(ex -> {
-                    ctx.channel().eventLoop().execute(() -> {
-                        ctx.writeAndFlush("ERROR " + ex.getCause().getMessage());
-                    });
-                    return null;
-                });
+                .thenAccept(
+                        token -> {
+                            ctx.channel()
+                                    .eventLoop()
+                                    .execute(
+                                            () -> {
+                                                ctx.writeAndFlush(token);
+                                            });
+                        })
+                .exceptionally(
+                        ex -> {
+                            ctx.channel()
+                                    .eventLoop()
+                                    .execute(
+                                            () -> {
+                                                ctx.writeAndFlush(
+                                                        "ERROR " + ex.getCause().getMessage());
+                                            });
+                            return null;
+                        });
     }
 }

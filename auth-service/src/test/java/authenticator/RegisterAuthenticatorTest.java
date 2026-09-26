@@ -55,7 +55,9 @@ class RegisterAuthenticatorTest {
 
     @BeforeAll
     void setupH2Database() throws SQLException {
-        connection = DriverManager.getConnection("jdbc:h2:mem:register_testdb;DB_CLOSE_DELAY=-1", "sa", "");
+        connection =
+                DriverManager.getConnection(
+                        "jdbc:h2:mem:register_testdb;DB_CLOSE_DELAY=-1", "sa", "");
 
         try (Statement statement = connection.createStatement()) {
             statement.execute(
@@ -103,7 +105,8 @@ class RegisterAuthenticatorTest {
         @DisplayName("Username: Lower boundary - exactly 3 characters should SUCCEED")
         void username_ExactMinBoundary_3Chars_Success() {
             String token =
-                    registerAuthenticator.login(new RegisterCommand("abc", "ValidPass123!", "salt", "abc@test.com"));
+                    registerAuthenticator.login(
+                            new RegisterCommand("abc", "ValidPass123!", "salt", "abc@test.com"));
             Assertions.assertNotNull(token);
         }
 
@@ -111,8 +114,10 @@ class RegisterAuthenticatorTest {
         @DisplayName("Username: Upper boundary - exactly 32 characters should SUCCEED")
         void username_ExactMaxBoundary_32Chars_Success() {
             String username32 = "a".repeat(32);
-            String token = registerAuthenticator.login(
-                    new RegisterCommand(username32, "ValidPass123!", "salt", "max@test.com"));
+            String token =
+                    registerAuthenticator.login(
+                            new RegisterCommand(
+                                    username32, "ValidPass123!", "salt", "max@test.com"));
             Assertions.assertNotNull(token);
         }
 
@@ -120,7 +125,8 @@ class RegisterAuthenticatorTest {
         @DisplayName("Password: Lower boundary - exactly 8 characters should SUCCEED")
         void password_ExactMinBoundary_8Chars_Success() {
             String token =
-                    registerAuthenticator.login(new RegisterCommand("valid_user", "Aa1!aaaa", "salt", "p8@test.com"));
+                    registerAuthenticator.login(
+                            new RegisterCommand("valid_user", "Aa1!aaaa", "salt", "p8@test.com"));
             Assertions.assertNotNull(token);
         }
 
@@ -129,7 +135,8 @@ class RegisterAuthenticatorTest {
         void password_ExactMaxBoundary_64Chars_Success() {
             String password64 = "Aa1!" + "b".repeat(60);
             String token =
-                    registerAuthenticator.login(new RegisterCommand("valid_user", password64, "salt", "p64@test.com"));
+                    registerAuthenticator.login(
+                            new RegisterCommand("valid_user", password64, "salt", "p64@test.com"));
             Assertions.assertNotNull(token);
         }
     }
@@ -143,8 +150,10 @@ class RegisterAuthenticatorTest {
         void register_NullUsername_ThrowsNpe() {
             Assertions.assertThrows(
                     NullPointerException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand(null, "ValidPass1!", "salt", "test@test.com")));
+                    () ->
+                            registerAuthenticator.login(
+                                    new RegisterCommand(
+                                            null, "ValidPass1!", "salt", "test@test.com")));
         }
 
         @Test
@@ -152,8 +161,10 @@ class RegisterAuthenticatorTest {
         void register_NullPassword_ThrowsNpe() {
             Assertions.assertThrows(
                     NullPointerException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand("valid_user", null, "salt", "test@test.com")));
+                    () ->
+                            registerAuthenticator.login(
+                                    new RegisterCommand(
+                                            "valid_user", null, "salt", "test@test.com")));
         }
 
         @ParameterizedTest
@@ -162,21 +173,25 @@ class RegisterAuthenticatorTest {
         void register_WhitespaceUsernames_Rejected(String whitespaceUser) {
             Assertions.assertThrows(
                     ValidationException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand(whitespaceUser, "ValidPass1!", "salt", "ws@test.com")));
+                    () ->
+                            registerAuthenticator.login(
+                                    new RegisterCommand(
+                                            whitespaceUser, "ValidPass1!", "salt", "ws@test.com")));
         }
 
         @Test
         @DisplayName("Optional fields: Registering with null salt and null email should SUCCEED")
         void register_NullSaltAndEmail_ShouldPersistSuccessfully() {
             String token =
-                    registerAuthenticator.login(new RegisterCommand("user_no_optional", "ValidPass1!", null, null));
+                    registerAuthenticator.login(
+                            new RegisterCommand("user_no_optional", "ValidPass1!", null, null));
             Assertions.assertNotNull(token);
 
             UserEntity savedUser = userRepository.getUser("user_no_optional");
             Assertions.assertNotNull(savedUser);
             Assertions.assertNull(savedUser.salt(), "Salt column should store null without errors");
-            Assertions.assertNull(savedUser.email(), "Email column should store null without errors");
+            Assertions.assertNull(
+                    savedUser.email(), "Email column should store null without errors");
         }
     }
 
@@ -196,20 +211,29 @@ class RegisterAuthenticatorTest {
                 })
         @DisplayName("Adversarial & SQLi username inputs must be blocked before reaching SQL")
         void register_AdversarialUsernames_BlockedByValidator(String maliciousUsername) {
-            ValidationException ex = Assertions.assertThrows(
-                    ValidationException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand(maliciousUsername, "ValidPass1!", "salt", "a@b.com")));
+            ValidationException ex =
+                    Assertions.assertThrows(
+                            ValidationException.class,
+                            () ->
+                                    registerAuthenticator.login(
+                                            new RegisterCommand(
+                                                    maliciousUsername,
+                                                    "ValidPass1!",
+                                                    "salt",
+                                                    "a@b.com")));
             Assertions.assertEquals("Username contains invalid characters", ex.getMessage());
         }
 
         @Test
-        @DisplayName("SQL injection payload in password should be safely escaped by PreparedStatement")
+        @DisplayName(
+                "SQL injection payload in password should be safely escaped by PreparedStatement")
         void register_SqlInjectionInPassword_SafelyEscaped() {
             String sqlPassword = "Admin';--123!\"#";
 
-            String token = registerAuthenticator.login(
-                    new RegisterCommand("sql_pass_user", sqlPassword, "salt", "test@test.com"));
+            String token =
+                    registerAuthenticator.login(
+                            new RegisterCommand(
+                                    "sql_pass_user", sqlPassword, "salt", "test@test.com"));
             Assertions.assertNotNull(token);
             UserEntity user = userRepository.getUser("sql_pass_user");
             Assertions.assertNotNull(user);
@@ -222,8 +246,10 @@ class RegisterAuthenticatorTest {
         void register_UnicodeAndEmojisInUsername_Rejected(String unicodeUser) {
             Assertions.assertThrows(
                     ValidationException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand(unicodeUser, "ValidPass1!", "salt", "u@test.com")));
+                    () ->
+                            registerAuthenticator.login(
+                                    new RegisterCommand(
+                                            unicodeUser, "ValidPass1!", "salt", "u@test.com")));
         }
     }
 
@@ -232,17 +258,20 @@ class RegisterAuthenticatorTest {
     class CommandContractTests {
 
         @Test
-        @DisplayName("Passing wrong command type (e.g. BasicCommand) should throw ClassCastException")
+        @DisplayName(
+                "Passing wrong command type (e.g. BasicCommand) should throw ClassCastException")
         void register_WrongCommandType_ThrowsClassCastException() {
             AuthCommand wrongCommand = new BasicCommand("user", "pass", "salt");
 
-            Assertions.assertThrows(ClassCastException.class, () -> registerAuthenticator.login(wrongCommand));
+            Assertions.assertThrows(
+                    ClassCastException.class, () -> registerAuthenticator.login(wrongCommand));
         }
 
         @Test
         @DisplayName("Passing null AuthCommand should throw NullPointerException")
         void register_NullCommand_ThrowsNullPointerException() {
-            Assertions.assertThrows(NullPointerException.class, () -> registerAuthenticator.login(null));
+            Assertions.assertThrows(
+                    NullPointerException.class, () -> registerAuthenticator.login(null));
         }
     }
 
@@ -255,28 +284,42 @@ class RegisterAuthenticatorTest {
         void register_SaltOverflow_ThrowsRuntimeException() {
             String hugeSalt = "s".repeat(51);
 
-            RuntimeException ex = Assertions.assertThrows(
-                    RuntimeException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand("valid_user", "ValidPass1!", hugeSalt, "test@test.com")));
+            RuntimeException ex =
+                    Assertions.assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    registerAuthenticator.login(
+                                            new RegisterCommand(
+                                                    "valid_user",
+                                                    "ValidPass1!",
+                                                    hugeSalt,
+                                                    "test@test.com")));
 
             Assertions.assertTrue(ex.getMessage().contains("Failed to save user"));
         }
 
         @Test
-        @DisplayName("Should fail with RuntimeException if database connection is prematurely closed")
+        @DisplayName(
+                "Should fail with RuntimeException if database connection is prematurely closed")
         void register_ClosedConnection_ThrowsRuntimeException() throws SQLException {
             Connection deadConnection =
-                    DriverManager.getConnection("jdbc:h2:mem:register_testdb;DB_CLOSE_DELAY=-1", "sa", "");
+                    DriverManager.getConnection(
+                            "jdbc:h2:mem:register_testdb;DB_CLOSE_DELAY=-1", "sa", "");
             UserRepository deadRepo = new UserRepository(deadConnection);
             RegisterAuthenticator deadAuthenticator = new RegisterAuthenticator(deadRepo);
 
             deadConnection.close();
 
-            RuntimeException ex = Assertions.assertThrows(
-                    RuntimeException.class,
-                    () -> deadAuthenticator.login(
-                            new RegisterCommand("valid_user", "ValidPass1!", "salt", "test@test.com")));
+            RuntimeException ex =
+                    Assertions.assertThrows(
+                            RuntimeException.class,
+                            () ->
+                                    deadAuthenticator.login(
+                                            new RegisterCommand(
+                                                    "valid_user",
+                                                    "ValidPass1!",
+                                                    "salt",
+                                                    "test@test.com")));
 
             Assertions.assertTrue(ex.getMessage().contains("Failed to save user"));
         }
@@ -284,12 +327,18 @@ class RegisterAuthenticatorTest {
         @Test
         @DisplayName("Duplicate registration with identical casing should fail UNIQUE constraint")
         void register_DuplicateUsername_FailsUniqueConstraint() {
-            registerAuthenticator.login(new RegisterCommand("unique_user", "ValidPass1!", "salt", "test@test.com"));
+            registerAuthenticator.login(
+                    new RegisterCommand("unique_user", "ValidPass1!", "salt", "test@test.com"));
 
             Assertions.assertThrows(
                     RuntimeException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand("unique_user", "OtherPass123!", "salt2", "test2@test.com")));
+                    () ->
+                            registerAuthenticator.login(
+                                    new RegisterCommand(
+                                            "unique_user",
+                                            "OtherPass123!",
+                                            "salt2",
+                                            "test2@test.com")));
         }
     }
 }

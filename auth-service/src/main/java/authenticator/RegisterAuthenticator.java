@@ -51,10 +51,14 @@ public class RegisterAuthenticator implements Authenticator {
 
         UsernameValidationResult result = Validator.validateUsername(registerCommand.username());
         if (!result.isValid()) throw new ValidationException(result.getMessage());
-        PasswordValidationResult passwordResult = Validator.validatePassword(registerCommand.password());
+        PasswordValidationResult passwordResult =
+                Validator.validatePassword(registerCommand.password());
         if (!passwordResult.isValid()) throw new ValidationException(passwordResult.getMessage());
         String userId =
-                userRepository.saveUser(registerCommand.username(), registerCommand.password(), registerCommand.salt());
+                userRepository.saveUser(
+                        registerCommand.username(),
+                        registerCommand.password(),
+                        registerCommand.salt());
         return JwtUtil.getInstance().generateJwt(userId, Map.of());
     }
 }

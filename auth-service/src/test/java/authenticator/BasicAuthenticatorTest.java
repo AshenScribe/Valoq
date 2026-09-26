@@ -88,10 +88,12 @@ class BasicAuthenticatorTest {
         }
     }
 
-    private void insertUser(String userId, String username, String passwordHash, String salt, String email)
+    private void insertUser(
+            String userId, String username, String passwordHash, String salt, String email)
             throws SQLException {
-        try (PreparedStatement stmt = connection.prepareStatement(
-                """
+        try (PreparedStatement stmt =
+                connection.prepareStatement(
+                        """
             INSERT INTO users (user_id, username, password_hash, salt, email)
             VALUES (?, ?, ?, ?, ?)
         """)) {
@@ -137,7 +139,8 @@ class BasicAuthenticatorTest {
         insertUser("usr-103", "bob", "correct_hash", "salt3", "bob@example.com");
 
         AuthCommand command = new BasicCommand("bob", "wrong_hash", "salt");
-        Assertions.assertThrows(UserNotFoundException.class, () -> basicAuthenticator.login(command));
+        Assertions.assertThrows(
+                UserNotFoundException.class, () -> basicAuthenticator.login(command));
     }
 
     @Test
@@ -146,7 +149,8 @@ class BasicAuthenticatorTest {
         insertUser("usr-104", "charlie", "SecretHash123", "salt4", "charlie@example.com");
 
         AuthCommand command = new BasicCommand("charlie", "secrethash123", "salt");
-        Assertions.assertThrows(UserNotFoundException.class, () -> basicAuthenticator.login(command));
+        Assertions.assertThrows(
+                UserNotFoundException.class, () -> basicAuthenticator.login(command));
     }
 
     @Test
@@ -158,7 +162,8 @@ class BasicAuthenticatorTest {
         Assertions.assertNotNull(basicAuthenticator.login(commandSuccess));
 
         AuthCommand commandFail = new BasicCommand("", "non_empty", "");
-        Assertions.assertThrows(UserNotFoundException.class, () -> basicAuthenticator.login(commandFail));
+        Assertions.assertThrows(
+                UserNotFoundException.class, () -> basicAuthenticator.login(commandFail));
     }
 
     @Test
@@ -166,8 +171,10 @@ class BasicAuthenticatorTest {
     void login_InvalidCommandType_ThrowsClassCastException() {
         AuthCommand invalidCommand = new AuthCommand() {};
 
-        assertThrows(ClassCastException.class, () -> {
-            basicAuthenticator.login(invalidCommand);
-        });
+        assertThrows(
+                ClassCastException.class,
+                () -> {
+                    basicAuthenticator.login(invalidCommand);
+                });
     }
 }

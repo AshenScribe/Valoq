@@ -38,17 +38,17 @@ import server.Session;
 
 class ChatMessageHandlerTest {
 
-    private EmbeddedChannel senderChannel;
-    private EmbeddedChannel receiverChannel;
-    private ConnectionTracker connectionTracker;
-
     private static final String TEST_USER_ID = "user123";
+
+    private EmbeddedChannel senderChannel;
+    private ConnectionTracker connectionTracker;
 
     @BeforeEach
     void setup() {
         connectionTracker = new ConnectionTracker();
 
-        senderChannel = new EmbeddedChannel(new ChatMessageHandler(new MessageRouter(connectionTracker)));
+        senderChannel =
+                new EmbeddedChannel(new ChatMessageHandler(new MessageRouter(connectionTracker)));
 
         Session session = new Session();
         session.setUserId(TEST_USER_ID);
@@ -62,7 +62,12 @@ class ChatMessageHandlerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"user456, SGVsbG8gd29ybGQh", "user_123, U29tZSBvdGhlciB0ZXh0", "bob, SGVsbG8=", "alice, SGVsbA=="})
+    @CsvSource({
+        "user456, SGVsbG8gd29ybGQh",
+        "user_123, U29tZSBvdGhlciB0ZXh0",
+        "bob, SGVsbG8=",
+        "alice, SGVsbA=="
+    })
     void testValidSendMessageFormat(String recipientId, String base64Payload) {
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
@@ -104,7 +109,8 @@ class ChatMessageHandlerTest {
 
             senderChannel.writeInbound("SEND " + recipientId + " " + base64Payload);
 
-            Assertions.assertEquals("FROM " + TEST_USER_ID + " " + base64Payload, recipientChannel.readOutbound());
+            Assertions.assertEquals(
+                    "FROM " + TEST_USER_ID + " " + base64Payload, recipientChannel.readOutbound());
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -123,9 +129,11 @@ class ChatMessageHandlerTest {
 
             senderChannel.writeInbound("SEND bob V29ybGQ=");
 
-            Assertions.assertEquals("FROM " + TEST_USER_ID + " SGVsbG8=", recipientChannel.readOutbound());
+            Assertions.assertEquals(
+                    "FROM " + TEST_USER_ID + " SGVsbG8=", recipientChannel.readOutbound());
 
-            Assertions.assertEquals("FROM " + TEST_USER_ID + " V29ybGQ=", recipientChannel.readOutbound());
+            Assertions.assertEquals(
+                    "FROM " + TEST_USER_ID + " V29ybGQ=", recipientChannel.readOutbound());
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -144,7 +152,8 @@ class ChatMessageHandlerTest {
 
             senderChannel.writeInbound("SEND bob SGVsbG8=");
 
-            Assertions.assertEquals("FROM " + TEST_USER_ID + " SGVsbG8=", bobChannel.readOutbound());
+            Assertions.assertEquals(
+                    "FROM " + TEST_USER_ID + " SGVsbG8=", bobChannel.readOutbound());
 
             Assertions.assertNull(aliceChannel.readOutbound());
 
@@ -196,7 +205,8 @@ class ChatMessageHandlerTest {
 
             senderChannel.writeInbound("SEND " + recipientId + " SGVsbG8=");
 
-            Assertions.assertEquals("FROM " + TEST_USER_ID + " SGVsbG8=", recipientChannel.readOutbound());
+            Assertions.assertEquals(
+                    "FROM " + TEST_USER_ID + " SGVsbG8=", recipientChannel.readOutbound());
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -233,9 +243,7 @@ class ChatMessageHandlerTest {
             Session session = new Session();
             session.setUserId("alice123");
 
-            senderChannel
-                    .attr(MessageServer.MessageServerInitializer.SESSION_KEY)
-                    .set(session);
+            senderChannel.attr(MessageServer.MessageServerInitializer.SESSION_KEY).set(session);
 
             senderChannel.writeInbound("SEND bob SGVsbG8=");
 

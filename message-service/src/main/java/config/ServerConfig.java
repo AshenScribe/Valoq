@@ -23,93 +23,48 @@
  */
 package config;
 
-public class ServerConfig {
+import org.aeonbits.owner.Config;
 
-    private DatabaseConfig database = new DatabaseConfig();
-    private ServerSettings server = new ServerSettings();
+@Config.Sources({"system:env"})
+public interface ServerConfig extends Config {
 
-    public ServerConfig() {}
+    @Key("PORT")
+    @DefaultValue("8002")
+    int serverPort();
 
-    public DatabaseConfig getDatabase() {
-        return database;
-    }
+    @Key("AUTH_HOST")
+    @DefaultValue("localhost")
+    String authHost();
 
-    public void setDatabase(DatabaseConfig database) {
-        this.database = database;
-    }
+    @Key("AUTH_PORT")
+    @DefaultValue("8081")
+    int authPort();
 
-    public ServerSettings getServer() {
-        return server;
-    }
+    @Key("DB_HOST")
+    @DefaultValue("localhost")
+    String databaseHost();
 
-    public void setServer(ServerSettings server) {
-        this.server = server;
-    }
+    @Key("DB_PORT")
+    @DefaultValue("9042")
+    int databasePort();
 
-    public String databaseHost() {
-        return database != null ? database.getHost() : null;
-    }
+    @Key("DB_KEYSPACE")
+    @DefaultValue("valoq_messages")
+    String databaseKeyspace();
 
-    public int databasePort() {
-        return database != null ? database.getPort() : 0;
-    }
+    @Key("DB_LOCAL_DATACENTER")
+    @DefaultValue("datacenter1")
+    String databaseLocalDatacenter();
 
-    public int serverPort() {
-        return server != null ? server.getPort() : 0;
-    }
+    @Key("DB_USER")
+    @DefaultValue("valoq_message_service")
+    String databaseUsername();
 
-    public static class DatabaseConfig {
-        private String host = "localhost";
-        private int port = 9042;
-        private String contactPoint;
-        private String localDatacenter = "datacenter1";
-        private String keyspace = "valoq_messages";
-        private String username;
-        private String password;
-        private SslConfig ssl = new SslConfig();
+    @Key("DB_PASSWORD")
+    @DefaultValue("message_service_password")
+    String databasePassword();
 
-        public DatabaseConfig() {}
-
-        public String getHost() { return host; }
-        public void setHost(String host) { this.host = host; }
-
-        public int getPort() { return port; }
-        public void setPort(int port) { this.port = port; }
-
-        public String getContactPoint() {
-            return contactPoint != null ? contactPoint : host;
-        }
-        public void setContactPoint(String contactPoint) { this.contactPoint = contactPoint; }
-
-        public String getLocalDatacenter() { return localDatacenter; }
-        public void setLocalDatacenter(String localDatacenter) { this.localDatacenter = localDatacenter; }
-
-        public String getKeyspace() { return keyspace; }
-        public void setKeyspace(String keyspace) { this.keyspace = keyspace; }
-
-        public String getUsername() { return username; }
-        public void setUsername(String username) { this.username = username; }
-
-        public String getPassword() { return password; }
-        public void setPassword(String password) { this.password = password; }
-
-        public SslConfig getSsl() { return ssl; }
-        public void setSsl(SslConfig ssl) { this.ssl = ssl; }
-    }
-
-    public static class SslConfig {
-        private boolean enabled = false;
-
-        public boolean isEnabled() { return enabled; }
-        public void setEnabled(boolean enabled) { this.enabled = enabled; }
-    }
-
-    public static class ServerSettings {
-        private int port = 8002;
-
-        public ServerSettings() {}
-
-        public int getPort() { return port; }
-        public void setPort(int port) { this.port = port; }
-    }
+    @Key("DB_SSL_ENABLED")
+    @DefaultValue("true")
+    boolean databaseSslEnabled();
 }

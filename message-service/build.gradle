@@ -32,22 +32,24 @@ dependencies {
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${libs.versions.junit.get()}"
     testRuntimeOnly libs.junit.platform.launcher
 
-    implementation libs.snake.yaml
+    implementation libs.owner
 
     implementation libs.cassandra.driver
     e2eTestImplementation libs.testcontainers.junit
     e2eTestImplementation libs.testcontainers.cassandra
     e2eTestImplementation libs.testcontainers.core
+
+    implementation libs.jackson.databind
 }
 
 application {
-    mainClass.set("Main")
+    mainClass.set("MessageMain")
     applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
 }
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(26))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 
@@ -90,7 +92,7 @@ tasks.register('e2eTest', Test) {
 
 spotless {
     java {
-        palantirJavaFormat()
+        googleJavaFormat('1.30.0').aosp()
         removeUnusedImports()
         licenseHeaderFile rootProject.file('LICENSE_HEADER')
     }
@@ -107,4 +109,8 @@ tasks.withType(Checkstyle).configureEach {
 
 tasks.named('check') {
     dependsOn tasks.named('e2eTest')
+}
+
+dependencyLocking {
+    lockAllConfigurations()
 }

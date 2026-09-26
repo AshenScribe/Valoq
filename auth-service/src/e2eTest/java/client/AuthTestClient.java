@@ -49,23 +49,31 @@ public class AuthTestClient implements AutoCloseable {
     public AuthTestClient(String host, int port) throws InterruptedException {
         this.group = new NioEventLoopGroup(1);
 
-        Bootstrap b = new Bootstrap()
-                .group(group)
-                .channel(NioSocketChannel.class)
-                .handler(new ChannelInitializer<SocketChannel>() {
-                    @Override
-                    protected void initChannel(SocketChannel ch) {
-                        ch.pipeline().addLast(new LineBasedFrameDecoder(1024));
-                        ch.pipeline().addLast(new StringDecoder(StandardCharsets.UTF_8));
-                        ch.pipeline().addLast(new StringEncoder(StandardCharsets.UTF_8));
-                        ch.pipeline().addLast(new SimpleChannelInboundHandler<String>() {
-                            @Override
-                            protected void channelRead0(ChannelHandlerContext ctx, String msg) {
-                                responses.offer(msg);
-                            }
-                        });
-                    }
-                });
+        Bootstrap b =
+                new Bootstrap()
+                        .group(group)
+                        .channel(NioSocketChannel.class)
+                        .handler(
+                                new ChannelInitializer<SocketChannel>() {
+                                    @Override
+                                    protected void initChannel(SocketChannel ch) {
+                                        ch.pipeline().addLast(new LineBasedFrameDecoder(1024));
+                                        ch.pipeline()
+                                                .addLast(new StringDecoder(StandardCharsets.UTF_8));
+                                        ch.pipeline()
+                                                .addLast(new StringEncoder(StandardCharsets.UTF_8));
+                                        ch.pipeline()
+                                                .addLast(
+                                                        new SimpleChannelInboundHandler<String>() {
+                                                            @Override
+                                                            protected void channelRead0(
+                                                                    ChannelHandlerContext ctx,
+                                                                    String msg) {
+                                                                responses.offer(msg);
+                                                            }
+                                                        });
+                                    }
+                                });
 
         this.channel = b.connect(host, port).sync().channel();
     }
@@ -73,8 +81,7 @@ public class AuthTestClient implements AutoCloseable {
     public String send(String command) {
         try {
             responses.clear();
-            channel.writeAndFlush(command.endsWith("\n") ? command : command + "\n")
-                    .sync();
+            channel.writeAndFlush(command.endsWith("\n") ? command : command + "\n").sync();
             String response = responses.poll(5, TimeUnit.SECONDS);
             if (response == null) {
                 throw new IllegalStateException("Timeout waiting for server response");
@@ -105,11 +112,13 @@ public class AuthTestClient implements AutoCloseable {
     }
 
     public String register(String username, String password, String salt, String email) {
-        String json = String.format(
-                "{\"username\":\"%s\",\"password\":\"%s\",\"salt\":\"%s\",\"email\":\"%s\"}",
-                username, password, salt, email);
+        String json =
+                String.format(
+                        "{\"username\":\"%s\",\"password\":\"%s\",\"salt\":\"%s\",\"email\":\"%s\"}",
+                        username, password, salt, email);
         String base64Payload =
-                java.util.Base64.getEncoder().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                java.util.Base64.getEncoder()
+                        .encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         return send("AUTH REGISTER " + base64Payload);
     }
 }

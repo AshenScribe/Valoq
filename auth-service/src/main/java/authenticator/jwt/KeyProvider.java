@@ -67,7 +67,8 @@ public final class KeyProvider {
         return publicKey;
     }
 
-    private PrivateKey loadPrivateKey() throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+    private PrivateKey loadPrivateKey()
+            throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
         String base64Str = readClasspathResource("private.key");
         byte[] keyBytes = Base64.getDecoder().decode(base64Str.trim());
 
@@ -75,7 +76,8 @@ public final class KeyProvider {
         return KeyFactory.getInstance("RSA").generatePrivate(spec);
     }
 
-    private PublicKey loadPublicKey() throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+    private PublicKey loadPublicKey()
+            throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
         String base64Str = readClasspathResource("public.key");
         byte[] keyBytes = Base64.getDecoder().decode(base64Str.trim());
 

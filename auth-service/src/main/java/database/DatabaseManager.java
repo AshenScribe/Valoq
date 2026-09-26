@@ -36,13 +36,13 @@ public final class DatabaseManager {
     private DatabaseManager() {}
 
     public static synchronized void init(ServerConfig config) {
-        if (dataSource != null && !dataSource.isClosed())
-            return;
+        if (dataSource != null && !dataSource.isClosed()) return;
 
         HikariConfig hikariConfig = new HikariConfig();
 
         ServerConfig.DatabaseProps db = config.database();
-        String jdbcUrl = String.format("jdbc:postgresql://%s:%d/%s", db.host(), db.port(), db.name());
+        String jdbcUrl =
+                String.format("jdbc:postgresql://%s:%d/%s", db.host(), db.port(), db.name());
 
         hikariConfig.setJdbcUrl(jdbcUrl);
         hikariConfig.setUsername(db.username());
@@ -50,9 +50,10 @@ public final class DatabaseManager {
         hikariConfig.setDriverClassName("org.postgresql.Driver");
 
         ServerConfig.DatabaseSslProps ssl = db.ssl();
-        String effectiveSslMode = (ssl != null && ssl.mode() != null && !ssl.mode().isBlank())
-                ? ssl.mode()
-                : db.sslMode();
+        String effectiveSslMode =
+                (ssl != null && ssl.mode() != null && !ssl.mode().isBlank())
+                        ? ssl.mode()
+                        : db.sslMode();
 
         if (effectiveSslMode != null && !effectiveSslMode.isBlank()) {
             hikariConfig.addDataSourceProperty("sslmode", effectiveSslMode);
@@ -77,7 +78,8 @@ public final class DatabaseManager {
     public static Connection getConnection() throws SQLException {
         HikariDataSource ds = dataSource;
         if (ds == null || ds.isClosed()) {
-            throw new IllegalStateException("DatabaseManager is not initialized or pool is closed.");
+            throw new IllegalStateException(
+                    "DatabaseManager is not initialized or pool is closed.");
         }
         return ds.getConnection();
     }

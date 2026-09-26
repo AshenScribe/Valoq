@@ -41,14 +41,16 @@ public class UserFixture {
     }
 
     public User createUser(String username, String passwordHash, String salt) {
-        User user = new User(
-                "usr_" + UUID.randomUUID().toString().substring(0, 8),
-                username,
-                passwordHash,
-                salt,
-                username + "@test.com");
+        User user =
+                new User(
+                        "usr_" + UUID.randomUUID().toString().substring(0, 8),
+                        username,
+                        passwordHash,
+                        salt,
+                        username + "@test.com");
 
-        String sql = "INSERT INTO users (user_id, username, password_hash, salt, email) VALUES (?, ?, ?, ?, ?)";
+        String sql =
+                "INSERT INTO users (user_id, username, password_hash, salt, email) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = DatabaseManager.getConnection(); // Auto-closed back to pool
                 PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, user.userId());

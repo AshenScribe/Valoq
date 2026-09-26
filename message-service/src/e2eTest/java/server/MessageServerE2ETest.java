@@ -53,19 +53,22 @@ class MessageServerE2ETest extends BaseIntegrationTest {
                 bob.sendTo("alice", "V29ybGQ=");
                 Assertions.assertEquals("FROM bob V29ybGQ=", alice.readLine());
 
-                String query = "SELECT sender_id, recipient_id, payload FROM valoq_messages.messages;";
+                String query =
+                        "SELECT sender_id, recipient_id, payload FROM valoq_messages.messages;";
                 long deadline = System.currentTimeMillis() + 3000;
                 int rowCount = 0;
                 while (System.currentTimeMillis() < deadline && rowCount < 2) {
-                    rowCount = session.execute(query).all().size();
+                    rowCount = getSession().execute(query).all().size();
                     if (rowCount < 2) Thread.sleep(50);
                 }
-                Assertions.assertEquals(2, rowCount, "Both messages must be persisted in Cassandra");
+                Assertions.assertEquals(
+                        2, rowCount, "Both messages must be persisted in Cassandra");
             }
         }
 
         @Test
-        @DisplayName("Sending to an offline recipient persists to Cassandra and returns error to sender")
+        @DisplayName(
+                "Sending to an offline recipient persists to Cassandra and returns error to sender")
         void sendToOfflineRecipientPersistsMessage() throws Exception {
             try (MessageTestClient alice = connect()) {
                 Assertions.assertEquals("SUCCESS", alice.init("alice"));
@@ -73,9 +76,11 @@ class MessageServerE2ETest extends BaseIntegrationTest {
                 alice.sendTo("offline_user", "SGVsbG8=");
                 Assertions.assertEquals("ERROR Recipient not connected", alice.readLine());
 
-                Row row = awaitRow(
-                        "SELECT sender_id, recipient_id, payload FROM valoq_messages.messages WHERE recipient_id = 'offline_user' ALLOW FILTERING;");
-                Assertions.assertNotNull(row, "Message to offline recipient must be saved in Cassandra");
+                Row row =
+                        awaitRow(
+                                "SELECT sender_id, recipient_id, payload FROM valoq_messages.messages WHERE recipient_id = 'offline_user' ALLOW FILTERING;");
+                Assertions.assertNotNull(
+                        row, "Message to offline recipient must be saved in Cassandra");
                 Assertions.assertEquals("alice", row.getString("sender_id"));
                 Assertions.assertEquals("SGVsbG8=", row.getString("payload"));
             }
@@ -95,7 +100,8 @@ class MessageServerE2ETest extends BaseIntegrationTest {
 
                 Assertions.assertEquals("FROM alice SGVsbG8gQm9i", bob.readLine());
                 Assertions.assertNull(
-                        charlie.readLine(Duration.ofMillis(200)), "Charlie should not receive message meant for Bob");
+                        charlie.readLine(Duration.ofMillis(200)),
+                        "Charlie should not receive message meant for Bob");
             }
         }
 
@@ -116,7 +122,8 @@ class MessageServerE2ETest extends BaseIntegrationTest {
     class ConnectionLifecycleTests {
 
         @Test
-        @DisplayName("When recipient disconnects, server must clean up registry and return error on subsequent sends")
+        @DisplayName(
+                "When recipient disconnects, server must clean up registry and return error on subsequent sends")
         void disconnectedRecipientBecomesUnreachable() throws Exception {
             try (MessageTestClient alice = connect();
                     MessageTestClient bob = connect()) {
@@ -126,7 +133,7 @@ class MessageServerE2ETest extends BaseIntegrationTest {
                 bob.close();
                 long deadline = System.currentTimeMillis() + 2000;
                 while (System.currentTimeMillis() < deadline
-                        && server.getConnectionTracker().get("bob") != null) {
+                        && getServer().getConnectionTracker().get("bob") != null) {
                     Thread.sleep(20);
                 }
 
@@ -136,7 +143,8 @@ class MessageServerE2ETest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Logging in with the same userId from a new connection overrides the old session")
+        @DisplayName(
+                "Logging in with the same userId from a new connection overrides the old getSession()")
         void duplicateUserUsesLatestConnection() throws Exception {
             try (MessageTestClient firstAlice = connect();
                     MessageTestClient secondAlice = connect();
@@ -149,7 +157,8 @@ class MessageServerE2ETest extends BaseIntegrationTest {
 
                 Assertions.assertEquals("FROM bob SGVsbG8=", secondAlice.readLine());
                 Assertions.assertNull(
-                        firstAlice.readLine(Duration.ofMillis(200)), "Old connection should not receive the message");
+                        firstAlice.readLine(Duration.ofMillis(200)),
+                        "Old connection should not receive the message");
             }
         }
     }
@@ -170,7 +179,8 @@ class MessageServerE2ETest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Malformed SEND returns ERROR format and keeps connection open for subsequent messages")
+        @DisplayName(
+                "Malformed SEND returns ERROR format and keeps connection open for subsequent messages")
         void malformedSendReturnsErrorAndKeepsConnectionAlive() throws Exception {
             try (MessageTestClient alice = connect();
                     MessageTestClient bob = connect()) {
@@ -223,13 +233,15 @@ class MessageServerE2ETest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Pipelined TCP write (multiple frames in one packet) must be processed independently")
+        @DisplayName(
+                "Pipelined TCP write (multiple frames in one packet) must be processed independently")
         void pipelinedCommandsInSinglePacket() throws Exception {
             try (MessageTestClient alice = connect();
                     MessageTestClient bob = connect()) {
 
                 bob.init("bob");
-                alice.send("INIT alice\nSEND bob UGlwZWxpbmVk\n");
+                String aliceToken = alice.createToken("alice");
+                alice.send("INIT " + aliceToken + "\nSEND bob UGlwZWxpbmVk\n");
 
                 Assertions.assertEquals("SUCCESS", alice.readLine());
                 Assertions.assertEquals("FROM alice UGlwZWxpbmVk", bob.readLine());

@@ -3,9 +3,14 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Valoq.iml" filepath="$PROJECT_DIR$/.idea/Valoq.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/auth-service.iml" filepath="$PROJECT_DIR$/.idea/modules/auth-service.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/auth-service.e2eTest.iml" filepath="$PROJECT_DIR$/.idea/modules/auth-service.e2eTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/auth-service.main.iml" filepath="$PROJECT_DIR$/.idea/modules/auth-service.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/auth-service.test.iml" filepath="$PROJECT_DIR$/.idea/modules/auth-service.test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/message-service.iml" filepath="$PROJECT_DIR$/.idea/modules/message-service.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/message-service.e2eTest.iml" filepath="$PROJECT_DIR$/.idea/modules/message-service.e2eTest.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/message-service.main.iml" filepath="$PROJECT_DIR$/.idea/modules/message-service.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/message-service.test.iml" filepath="$PROJECT_DIR$/.idea/modules/message-service.test.iml" />
     </modules>
   </component>
 </project>

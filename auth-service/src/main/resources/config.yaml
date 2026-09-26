@@ -1,17 +1,17 @@
 server:
   host: localhost
-  port: 8001
+  port: !ENV ${PORT:-8081}
   ssl:
     enabled: false
 
 database:
-  host: localhost
-  port: 5432
-  name: valoq
-  username: valoq_auth_service
-  password: auth_service_password
+  host: !ENV ${DB_HOST:-localhost}
+  port: !ENV ${DB_PORT:-5432}
+  name: !ENV ${DB_NAME:-valoq}
+  username: !ENV ${DB_USER}
+  password: !ENV ${DB_PASSWORD}
   ssl:
     mode: require
 
 jwt:
-  expirationSeconds: 300
+  expirationSeconds: !ENV ${JWT_EXPIRATION_SECONDS:-3600}

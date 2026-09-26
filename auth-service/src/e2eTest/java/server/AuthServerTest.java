@@ -81,11 +81,13 @@ class AuthServerTest extends BaseIntegrationTest {
         try (AuthTestClient client = createClient()) {
             String base64PublicKey = client.getPublicKey();
             byte[] keyBytes = Base64.getDecoder().decode(base64PublicKey.trim());
-            PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(keyBytes));
+            PublicKey publicKey =
+                    KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(keyBytes));
             String token = client.loginBasic(user.username(), user.passwordHash(), user.salt());
-            Assertions.assertDoesNotThrow(() -> {
-                Jwts.parser().verifyWith(publicKey).build().parseSignedClaims(token);
-            });
+            Assertions.assertDoesNotThrow(
+                    () -> {
+                        Jwts.parser().verifyWith(publicKey).build().parseSignedClaims(token);
+                    });
         }
     }
 
@@ -114,18 +116,26 @@ class AuthServerTest extends BaseIntegrationTest {
 
         for (int i = 0; i < clientCount; i++) {
             final int index = i;
-            futures.add(CompletableFuture.runAsync(() -> {
-                try {
-                    User user = users().createUser("concurrent_" + index, "pwd", "salt");
-                    try (AuthTestClient client = createClient()) {
-                        String jwt = client.loginBasic(user.username(), user.passwordHash(), user.salt());
-                        Assertions.assertTrue(
-                                JwtUtil.getInstance().parseJwt(jwt).isPresent());
-                    }
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }));
+            futures.add(
+                    CompletableFuture.runAsync(
+                            () -> {
+                                try {
+                                    User user =
+                                            users().createUser(
+                                                            "concurrent_" + index, "pwd", "salt");
+                                    try (AuthTestClient client = createClient()) {
+                                        String jwt =
+                                                client.loginBasic(
+                                                        user.username(),
+                                                        user.passwordHash(),
+                                                        user.salt());
+                                        Assertions.assertTrue(
+                                                JwtUtil.getInstance().parseJwt(jwt).isPresent());
+                                    }
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }));
         }
 
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
@@ -142,7 +152,8 @@ class AuthServerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should register over TCP, return valid JWT, and allow login over the same connection")
+    @DisplayName(
+            "Should register over TCP, return valid JWT, and allow login over the same connection")
     void testRegisterAndLoginOverNetty() throws Exception {
         String username = "netty_registered_user";
         String password = "SecurePassword99!";

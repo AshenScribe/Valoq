@@ -59,20 +59,25 @@ class RegisterAuthenticatorTest extends BaseIntegrationTest {
     class SuccessTests {
 
         @Test
-        @DisplayName("Should successfully register a new user, persist to database, and return valid JWT")
+        @DisplayName(
+                "Should successfully register a new user, persist to database, and return valid JWT")
         void register_ValidUser_Success() {
             String username = "valid_user";
             String password = "StrongPassword123!";
             String salt = "random_salt_123";
             String email = "valid_user@example.com";
 
-            String token = registerAuthenticator.login(new RegisterCommand(username, password, salt, email));
+            String token =
+                    registerAuthenticator.login(
+                            new RegisterCommand(username, password, salt, email));
             Assertions.assertNotNull(token, "JWT token should not be null");
             Optional<Claims> claimsOpt = JwtUtil.getInstance().parseJwt(token);
-            Assertions.assertTrue(claimsOpt.isPresent(), "Generated JWT should be valid and parseable");
+            Assertions.assertTrue(
+                    claimsOpt.isPresent(), "Generated JWT should be valid and parseable");
 
             String tokenSubject = claimsOpt.get().getSubject();
-            Assertions.assertTrue(tokenSubject.startsWith("usr_"), "Subject must be the generated user ID");
+            Assertions.assertTrue(
+                    tokenSubject.startsWith("usr_"), "Subject must be the generated user ID");
             UserEntity savedUser = userRepository.getUser(username);
             Assertions.assertNotNull(savedUser, "User must be found in database");
             Assertions.assertEquals(tokenSubject, savedUser.userId());
@@ -82,16 +87,19 @@ class RegisterAuthenticatorTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Newly registered user should immediately be able to log in via BasicAuthenticator")
+        @DisplayName(
+                "Newly registered user should immediately be able to log in via BasicAuthenticator")
         void register_ThenBasicLogin_Success() {
             String username = "quick_login_user";
             String password = "SecurePassword1!";
             String salt = "salt_xyz";
 
-            registerAuthenticator.login(new RegisterCommand(username, password, salt, "user@domain.com"));
+            registerAuthenticator.login(
+                    new RegisterCommand(username, password, salt, "user@domain.com"));
 
             BasicAuthenticator basicAuthenticator = new BasicAuthenticator(userRepository);
-            String loginToken = basicAuthenticator.login(new BasicCommand(username, password, salt));
+            String loginToken =
+                    basicAuthenticator.login(new BasicCommand(username, password, salt));
 
             Assertions.assertNotNull(loginToken);
             Assertions.assertTrue(JwtUtil.getInstance().parseJwt(loginToken).isPresent());
@@ -106,12 +114,19 @@ class RegisterAuthenticatorTest extends BaseIntegrationTest {
         @ValueSource(strings = {"a", "ab"})
         @DisplayName("Should reject usernames shorter than 3 characters")
         void register_UsernameTooShort_ThrowsValidationException(String shortUsername) {
-            ValidationException ex = Assertions.assertThrows(
-                    ValidationException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand(shortUsername, "StrongPassword1!", "salt", "a@b.com")));
+            ValidationException ex =
+                    Assertions.assertThrows(
+                            ValidationException.class,
+                            () ->
+                                    registerAuthenticator.login(
+                                            new RegisterCommand(
+                                                    shortUsername,
+                                                    "StrongPassword1!",
+                                                    "salt",
+                                                    "a@b.com")));
 
-            Assertions.assertEquals("Username is too short, must be at least 3 characters", ex.getMessage());
+            Assertions.assertEquals(
+                    "Username is too short, must be at least 3 characters", ex.getMessage());
         }
 
         @Test
@@ -119,22 +134,37 @@ class RegisterAuthenticatorTest extends BaseIntegrationTest {
         void register_UsernameTooLong_ThrowsValidationException() {
             String longUsername = "a".repeat(33);
 
-            ValidationException ex = Assertions.assertThrows(
-                    ValidationException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand(longUsername, "StrongPassword1!", "salt", "a@b.com")));
+            ValidationException ex =
+                    Assertions.assertThrows(
+                            ValidationException.class,
+                            () ->
+                                    registerAuthenticator.login(
+                                            new RegisterCommand(
+                                                    longUsername,
+                                                    "StrongPassword1!",
+                                                    "salt",
+                                                    "a@b.com")));
 
-            Assertions.assertEquals("Username is too long, must be less than 32 characters", ex.getMessage());
+            Assertions.assertEquals(
+                    "Username is too long, must be less than 32 characters", ex.getMessage());
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {"user@name", "user name", "user-name", "user.name", "user#123", "user!"})
-        @DisplayName("Should reject usernames containing characters other than alphanumeric and underscore")
+        @ValueSource(
+                strings = {"user@name", "user name", "user-name", "user.name", "user#123", "user!"})
+        @DisplayName(
+                "Should reject usernames containing characters other than alphanumeric and underscore")
         void register_UsernameInvalidCharacters_ThrowsValidationException(String invalidUsername) {
-            ValidationException ex = Assertions.assertThrows(
-                    ValidationException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand(invalidUsername, "StrongPassword1!", "salt", "a@b.com")));
+            ValidationException ex =
+                    Assertions.assertThrows(
+                            ValidationException.class,
+                            () ->
+                                    registerAuthenticator.login(
+                                            new RegisterCommand(
+                                                    invalidUsername,
+                                                    "StrongPassword1!",
+                                                    "salt",
+                                                    "a@b.com")));
 
             Assertions.assertEquals("Username contains invalid characters", ex.getMessage());
         }
@@ -147,11 +177,16 @@ class RegisterAuthenticatorTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should reject passwords shorter than 8 characters")
         void register_PasswordTooShort_ThrowsValidationException() {
-            ValidationException ex = Assertions.assertThrows(
-                    ValidationException.class,
-                    () -> registerAuthenticator.login(new RegisterCommand("valid_user", "Short1!", "salt", "a@b.com")));
+            ValidationException ex =
+                    Assertions.assertThrows(
+                            ValidationException.class,
+                            () ->
+                                    registerAuthenticator.login(
+                                            new RegisterCommand(
+                                                    "valid_user", "Short1!", "salt", "a@b.com")));
 
-            Assertions.assertEquals("Password is too short, must be at least 8 characters", ex.getMessage());
+            Assertions.assertEquals(
+                    "Password is too short, must be at least 8 characters", ex.getMessage());
         }
 
         @Test
@@ -159,43 +194,70 @@ class RegisterAuthenticatorTest extends BaseIntegrationTest {
         void register_PasswordTooLong_ThrowsValidationException() {
             String longPassword = "A1!" + "a".repeat(65);
 
-            ValidationException ex = Assertions.assertThrows(
-                    ValidationException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand("valid_user", longPassword, "salt", "a@b.com")));
+            ValidationException ex =
+                    Assertions.assertThrows(
+                            ValidationException.class,
+                            () ->
+                                    registerAuthenticator.login(
+                                            new RegisterCommand(
+                                                    "valid_user",
+                                                    longPassword,
+                                                    "salt",
+                                                    "a@b.com")));
 
-            Assertions.assertEquals("Password is too long, must be less than 64 characters", ex.getMessage());
+            Assertions.assertEquals(
+                    "Password is too long, must be less than 64 characters", ex.getMessage());
         }
 
         @Test
         @DisplayName("Should reject password missing uppercase letters")
         void register_PasswordNoUppercase_ThrowsValidationException() {
-            ValidationException ex = Assertions.assertThrows(
-                    ValidationException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand("valid_user", "lowercase1!", "salt", "a@b.com")));
+            ValidationException ex =
+                    Assertions.assertThrows(
+                            ValidationException.class,
+                            () ->
+                                    registerAuthenticator.login(
+                                            new RegisterCommand(
+                                                    "valid_user",
+                                                    "lowercase1!",
+                                                    "salt",
+                                                    "a@b.com")));
 
-            Assertions.assertEquals("Password must contain at least one uppercase letter", ex.getMessage());
+            Assertions.assertEquals(
+                    "Password must contain at least one uppercase letter", ex.getMessage());
         }
 
         @Test
         @DisplayName("Should reject password missing lowercase letters")
         void register_PasswordNoLowercase_ThrowsValidationException() {
-            ValidationException ex = Assertions.assertThrows(
-                    ValidationException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand("valid_user", "UPPERCASE1!", "salt", "a@b.com")));
+            ValidationException ex =
+                    Assertions.assertThrows(
+                            ValidationException.class,
+                            () ->
+                                    registerAuthenticator.login(
+                                            new RegisterCommand(
+                                                    "valid_user",
+                                                    "UPPERCASE1!",
+                                                    "salt",
+                                                    "a@b.com")));
 
-            Assertions.assertEquals("Password must contain at least one lowercase letter", ex.getMessage());
+            Assertions.assertEquals(
+                    "Password must contain at least one lowercase letter", ex.getMessage());
         }
 
         @Test
         @DisplayName("Should reject password missing numbers")
         void register_PasswordNoNumber_ThrowsValidationException() {
-            ValidationException ex = Assertions.assertThrows(
-                    ValidationException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand("valid_user", "NoNumberSpecial!", "salt", "a@b.com")));
+            ValidationException ex =
+                    Assertions.assertThrows(
+                            ValidationException.class,
+                            () ->
+                                    registerAuthenticator.login(
+                                            new RegisterCommand(
+                                                    "valid_user",
+                                                    "NoNumberSpecial!",
+                                                    "salt",
+                                                    "a@b.com")));
 
             Assertions.assertEquals("Password must contain at least one number", ex.getMessage());
         }
@@ -203,13 +265,20 @@ class RegisterAuthenticatorTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should reject password missing special characters")
         void register_PasswordNoSpecialChar_ThrowsValidationException() {
-            ValidationException ex = Assertions.assertThrows(
-                    ValidationException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand("valid_user", "NoSpecial123", "salt", "a@b.com")));
+            ValidationException ex =
+                    Assertions.assertThrows(
+                            ValidationException.class,
+                            () ->
+                                    registerAuthenticator.login(
+                                            new RegisterCommand(
+                                                    "valid_user",
+                                                    "NoSpecial123",
+                                                    "salt",
+                                                    "a@b.com")));
 
             Assertions.assertEquals(
-                    "Password must contain at least one special character (!@#$%^&*()-_+=<>?)", ex.getMessage());
+                    "Password must contain at least one special character (!@#$%^&*()-_+=<>?)",
+                    ex.getMessage());
         }
     }
 
@@ -221,11 +290,14 @@ class RegisterAuthenticatorTest extends BaseIntegrationTest {
         @DisplayName("Should fail when attempting to register an already existing username")
         void register_DuplicateUsername_ThrowsException() {
             String username = "existing_user";
-            registerAuthenticator.login(new RegisterCommand(username, "StrongPass1!", "salt1", "a@b.com"));
+            registerAuthenticator.login(
+                    new RegisterCommand(username, "StrongPass1!", "salt1", "a@b.com"));
             Assertions.assertThrows(
                     RuntimeException.class,
-                    () -> registerAuthenticator.login(
-                            new RegisterCommand(username, "StrongPass2@", "salt2", "c@d.com")));
+                    () ->
+                            registerAuthenticator.login(
+                                    new RegisterCommand(
+                                            username, "StrongPass2@", "salt2", "c@d.com")));
         }
 
         @Test
@@ -233,7 +305,8 @@ class RegisterAuthenticatorTest extends BaseIntegrationTest {
         void register_InvalidCommandType_ThrowsClassCastException() {
             AuthCommand invalidCommand = new AuthCommand() {};
 
-            Assertions.assertThrows(ClassCastException.class, () -> registerAuthenticator.login(invalidCommand));
+            Assertions.assertThrows(
+                    ClassCastException.class, () -> registerAuthenticator.login(invalidCommand));
         }
     }
 }

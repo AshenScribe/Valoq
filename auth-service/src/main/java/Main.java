@@ -36,10 +36,13 @@ public final class Main {
         DatabaseManager.init(appConfig);
         JwtUtil.getInstance(appConfig.jwt().expirationSeconds());
         AuthServer server = new AuthServer(appConfig);
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            server.stop();
-            DatabaseManager.close();
-        }));
+        Runtime.getRuntime()
+                .addShutdownHook(
+                        new Thread(
+                                () -> {
+                                    server.stop();
+                                    DatabaseManager.close();
+                                }));
         server.start();
     }
 }

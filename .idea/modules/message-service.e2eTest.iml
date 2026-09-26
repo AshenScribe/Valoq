@@ -1,9 +1,84 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module version="4">
+<module external.linked.project.id="message-service:e2eTest" external.linked.project.path="$MODULE_DIR$/../../message-service" external.root.project.path="$MODULE_DIR$/../../message-service" external.system.id="GRADLE" external.system.module.group="" external.system.module.type="sourceSet" external.system.module.version="unspecified" type="JAVA_MODULE" version="4">
   <component name="AdditionalModuleElements">
     <content url="file://$MODULE_DIR$/../../message-service/src/e2eTest" dumb="true">
       <sourceFolder url="file://$MODULE_DIR$/../../message-service/src/e2eTest/java" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/../../message-service/src/e2eTest/resources" type="java-resource" />
     </content>
+  </component>
+  <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_25">
+    <output url="file://$MODULE_DIR$/../../message-service/build/classes/java/e2eTest" />
+    <exclude-output />
+    <content url="file://$MODULE_DIR$/../../message-service/src/e2eTest">
+      <sourceFolder url="file://$MODULE_DIR$/../../message-service/src/e2eTest/java" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../message-service/src/e2eTest/resources" type="java-resource" />
+    </content>
+    <orderEntry type="jdk" jdkName="ms-25" jdkType="JavaSDK" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="Gradle: org.testcontainers:testcontainers-junit-jupiter:2.0.5" level="project" />
+    <orderEntry type="library" name="Gradle: org.testcontainers:testcontainers-cassandra:2.0.5" level="project" />
+    <orderEntry type="library" name="Gradle: org.testcontainers:testcontainers:2.0.5" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-buffer:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-transport:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-common:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-codec:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-transport-native-epoll:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-handler:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: org.slf4j:slf4j-api:2.0.19" level="project" />
+    <orderEntry type="library" name="Gradle: org.slf4j:slf4j-simple:2.0.19" level="project" />
+    <orderEntry type="library" name="Gradle: org.aeonbits.owner:owner:1.0.12" level="project" />
+    <orderEntry type="library" name="Gradle: org.apache.cassandra:java-driver-core:4.19.3" level="project" />
+    <orderEntry type="library" name="Gradle: com.fasterxml.jackson.core:jackson-databind:2.22.2" level="project" />
+    <orderEntry type="library" name="Gradle: org.codehaus.groovy:groovy:3.0.5" level="project" />
+    <orderEntry type="library" name="Gradle: org.junit.jupiter:junit-jupiter-api:5.7.1" level="project" />
+    <orderEntry type="library" name="Gradle: org.junit.jupiter:junit-jupiter-engine:5.7.1" level="project" />
+    <orderEntry type="library" name="Gradle: org.junit.jupiter:junit-jupiter-params:5.7.1" level="project" />
+    <orderEntry type="library" name="Gradle: org.testcontainers:testcontainers-database-commons:2.0.5" level="project" />
+    <orderEntry type="library" name="Gradle: com.datastax.cassandra:cassandra-driver-core:3.10.0" level="project" />
+    <orderEntry type="library" name="Gradle: org.apache.commons:commons-compress:1.28.0" level="project" />
+    <orderEntry type="library" name="Gradle: org.rnorth.duct-tape:duct-tape:1.0.8" level="project" />
+    <orderEntry type="library" name="Gradle: com.github.docker-java:docker-java-api:3.7.1" level="project" />
+    <orderEntry type="library" name="Gradle: com.github.docker-java:docker-java-transport-zerodep:3.7.1" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-resolver:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-codec-base:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-codec-compression:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-codec-protobuf:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-codec-marshalling:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-transport-native-unix-common:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-transport-classes-epoll:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: com.datastax.oss:native-protocol:1.5.2" level="project" />
+    <orderEntry type="library" name="Gradle: org.apache.cassandra:java-driver-guava-shaded:4.19.3" level="project" />
+    <orderEntry type="library" name="Gradle: com.typesafe:config:1.4.1" level="project" />
+    <orderEntry type="library" name="Gradle: com.github.jnr:jnr-posix:3.1.15" level="project" />
+    <orderEntry type="library" name="Gradle: io.dropwizard.metrics:metrics-core:4.1.18" level="project" />
+    <orderEntry type="library" name="Gradle: org.hdrhistogram:HdrHistogram:2.1.12" level="project" />
+    <orderEntry type="library" name="Gradle: com.fasterxml.jackson.core:jackson-core:2.22.2" level="project" />
+    <orderEntry type="library" name="Gradle: org.reactivestreams:reactive-streams:1.0.3" level="project" />
+    <orderEntry type="library" name="Gradle: com.fasterxml.jackson.core:jackson-annotations:2.22" level="project" />
+    <orderEntry type="library" name="Gradle: org.apiguardian:apiguardian-api:1.1.0" level="project" />
+    <orderEntry type="library" name="Gradle: org.opentest4j:opentest4j:1.2.0" level="project" />
+    <orderEntry type="library" name="Gradle: org.junit.platform:junit-platform-commons:1.7.1" level="project" />
+    <orderEntry type="library" name="Gradle: org.junit.platform:junit-platform-engine:1.7.1" level="project" />
+    <orderEntry type="library" name="Gradle: com.google.guava:guava:19.0" level="project" />
+    <orderEntry type="library" name="Gradle: com.github.jnr:jnr-ffi:2.2.11" level="project" />
+    <orderEntry type="library" name="Gradle: commons-codec:commons-codec:1.19.0" level="project" />
+    <orderEntry type="library" name="Gradle: commons-io:commons-io:2.20.0" level="project" />
+    <orderEntry type="library" name="Gradle: org.apache.commons:commons-lang3:3.18.0" level="project" />
+    <orderEntry type="library" name="Gradle: org.jetbrains:annotations:17.0.0" level="project" />
+    <orderEntry type="library" name="Gradle: com.github.docker-java:docker-java-transport:3.7.1" level="project" />
+    <orderEntry type="library" name="Gradle: net.java.dev.jna:jna:5.18.1" level="project" />
+    <orderEntry type="library" name="Gradle: com.github.jnr:jnr-constants:0.10.3" level="project" />
+    <orderEntry type="library" name="Gradle: com.github.jnr:jffi:1.3.9" level="project" />
+    <orderEntry type="library" name="Gradle: org.ow2.asm:asm:9.2" level="project" />
+    <orderEntry type="library" name="Gradle: org.ow2.asm:asm-commons:9.2" level="project" />
+    <orderEntry type="library" name="Gradle: org.ow2.asm:asm-analysis:9.2" level="project" />
+    <orderEntry type="library" name="Gradle: org.ow2.asm:asm-tree:9.2" level="project" />
+    <orderEntry type="library" name="Gradle: org.ow2.asm:asm-util:9.2" level="project" />
+    <orderEntry type="library" name="Gradle: com.github.jnr:jnr-a64asm:1.0.0" level="project" />
+    <orderEntry type="library" name="Gradle: com.github.jnr:jnr-x86asm:1.0.2" level="project" />
+    <orderEntry type="module" module-name="message-service.main" />
+    <orderEntry type="module" module-name="message-service.test" production-on-test="" />
+    <orderEntry type="library" scope="RUNTIME" name="Gradle: org.junit.platform:junit-platform-launcher:1.7.1" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Gradle: com.github.jnr:jffi:native:1.3.9" level="project" />
   </component>
 </module>

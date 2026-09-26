@@ -48,16 +48,16 @@ public class ChatMessageHandler extends SimpleChannelInboundHandler<String> {
             return;
         }
 
-        final Session session = ctx.channel()
-                .attr(MessageServer.MessageServerInitializer.SESSION_KEY)
-                .get();
+        final Session session =
+                ctx.channel().attr(MessageServer.MessageServerInitializer.SESSION_KEY).get();
 
         if (session == null || session.getUserId() == null) {
             ctx.writeAndFlush("ERROR Session not initialized");
             return;
         }
 
-        boolean delivered = messageRouter.route(session.getUserId(), matcher.group(1), matcher.group(2));
+        boolean delivered =
+                messageRouter.route(session.getUserId(), matcher.group(1), matcher.group(2));
 
         if (!delivered) {
             ctx.writeAndFlush("ERROR Recipient not connected");

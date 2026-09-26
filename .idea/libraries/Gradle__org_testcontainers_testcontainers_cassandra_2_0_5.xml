@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: org.testcontainers:testcontainers-cassandra:2.0.5" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="org.testcontainers" artifactId="testcontainers-cassandra" version="2.0.5" baseVersion="2.0.5" />
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../.gradle/caches/modules-2/files-2.1/org.testcontainers/testcontainers-cassandra/2.0.5/5a29efc8911634d12290ccb983668f45669c738f/testcontainers-cassandra-2.0.5.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/../.gradle/caches/modules-2/files-2.1/org.testcontainers/testcontainers-cassandra/2.0.5/d88704f64e1e2231f6a7781de05165c37fb2c093/testcontainers-cassandra-2.0.5-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

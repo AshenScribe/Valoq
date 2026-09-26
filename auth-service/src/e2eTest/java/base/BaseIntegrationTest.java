@@ -39,11 +39,12 @@ import server.AuthServer;
 
 public abstract class BaseIntegrationTest {
 
-    protected static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:15")
-            .withDatabaseName("testdb")
-            .withUsername("testuser")
-            .withPassword("testpass")
-            .withInitScript("init.sql");
+    protected static final PostgreSQLContainer postgres =
+            new PostgreSQLContainer("postgres:15")
+                    .withDatabaseName("testdb")
+                    .withUsername("testuser")
+                    .withPassword("testpass")
+                    .withInitScript("init.sql");
 
     protected static ServerConfig config;
     protected static AuthServer server;

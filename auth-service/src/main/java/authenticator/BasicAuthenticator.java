@@ -49,11 +49,14 @@ public class BasicAuthenticator implements Authenticator {
         BasicCommand basicCommand = (BasicCommand) authCommand;
         User user = UserMapper.mapToUser(userRepository.getUser(basicCommand.username()));
         if (user == null)
-            throw new UserNotFoundException(String.format("User with username %s not found", basicCommand.username()));
+            throw new UserNotFoundException(
+                    String.format("User with username %s not found", basicCommand.username()));
         if (user.passwordHash().equals(basicCommand.password())) {
             return JwtUtil.getInstance().generateJwt(user.userId(), Map.of());
         }
         throw new UserNotFoundException(
-                String.format("User with username %s not found or password does not match", basicCommand.username()));
+                String.format(
+                        "User with username %s not found or password does not match",
+                        basicCommand.username()));
     }
 }

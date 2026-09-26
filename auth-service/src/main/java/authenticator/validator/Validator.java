@@ -29,7 +29,8 @@ public final class Validator {
     public static UsernameValidationResult validateUsername(String username) {
         if (username.length() < 3) return UsernameValidationResult.INVALID_TOO_SHORT;
         if (username.length() > 32) return UsernameValidationResult.INVALID_TOO_LONG;
-        if (!username.matches("^[a-zA-Z0-9_]+$")) return UsernameValidationResult.INVALID_CHARACTERS;
+        if (!username.matches("^[a-zA-Z0-9_]+$"))
+            return UsernameValidationResult.INVALID_CHARACTERS;
         return UsernameValidationResult.VALID;
     }
 

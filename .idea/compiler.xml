@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel>
+      <module name="auth-service" target="25" />
+      <module name="auth-service.e2eTest" target="25" />
+      <module name="auth-service.main" target="25" />
+      <module name="auth-service.test" target="25" />
+      <module name="message-service" target="25" />
+      <module name="message-service.e2eTest" target="25" />
+      <module name="message-service.main" target="25" />
+      <module name="message-service.test" target="25" />
+    </bytecodeTargetLevel>
+  </component>
+</project>

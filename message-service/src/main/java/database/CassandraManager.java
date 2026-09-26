@@ -39,27 +39,29 @@ public final class CassandraManager {
 
     private CassandraManager() {}
 
-    public static synchronized void init(ServerConfig.DatabaseConfig config) {
+    public static synchronized void init(ServerConfig config) {
         if (session != null && !session.isClosed()) {
             return;
         }
 
-        String host = config.getContactPoint() != null ? config.getContactPoint() : config.getHost();
-        String datacenter = config.getLocalDatacenter() != null ? config.getLocalDatacenter() : "datacenter1";
+        String host = config.databaseHost();
+        String datacenter = config.databaseLocalDatacenter();
 
-        CqlSessionBuilder builder = CqlSession.builder()
-                .addContactPoint(new InetSocketAddress(host, config.getPort()))
-                .withLocalDatacenter(datacenter);
+        CqlSessionBuilder builder =
+                CqlSession.builder()
+                        .addContactPoint(new InetSocketAddress(host, config.databasePort()))
+                        .withLocalDatacenter(datacenter)
+                        .withAuthCredentials(config.databaseUsername(), config.databasePassword());
 
-        if (config.getKeyspace() != null && !config.getKeyspace().isBlank()) {
-            builder.withKeyspace(config.getKeyspace());
+        if (config.databaseKeyspace() != null && !config.databaseKeyspace().isBlank()) {
+            builder.withKeyspace(config.databaseKeyspace());
         }
 
-        if (config.getUsername() != null && !config.getUsername().isBlank()) {
-            builder.withAuthCredentials(config.getUsername(), config.getPassword());
+        if (config.databaseUsername() != null && !config.databaseUsername().isBlank()) {
+            builder.withAuthCredentials(config.databaseUsername(), config.databasePassword());
         }
 
-        if (config.getSsl() != null && config.getSsl().isEnabled()) {
+        if (config.databaseSslEnabled()) {
             builder.withSslContext(createDevSslContext());
         }
 
@@ -68,13 +70,20 @@ public final class CassandraManager {
 
     private static SSLContext createDevSslContext() {
         try {
-            TrustManager[] trustAll = new TrustManager[] {
-                    new X509TrustManager() {
-                        public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-                        public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                        public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-                    }
-            };
+            TrustManager[] trustAll =
+                    new TrustManager[] {
+                        new X509TrustManager() {
+                            public X509Certificate[] getAcceptedIssuers() {
+                                return new X509Certificate[0];
+                            }
+
+                            public void checkClientTrusted(
+                                    X509Certificate[] certs, String authType) {}
+
+                            public void checkServerTrusted(
+                                    X509Certificate[] certs, String authType) {}
+                        }
+                    };
             SSLContext sslContext = SSLContext.getInstance("TLS");
             sslContext.init(null, trustAll, new SecureRandom());
             return sslContext;
@@ -86,7 +95,8 @@ public final class CassandraManager {
     public static CqlSession getSession() {
         CqlSession s = session;
         if (s == null || s.isClosed()) {
-            throw new IllegalStateException("CassandraManager is not initialized or session is closed.");
+            throw new IllegalStateException(
+                    "CassandraManager is not initialized or session is closed.");
         }
         return s;
     }

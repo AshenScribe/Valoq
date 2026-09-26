@@ -42,9 +42,13 @@ public class TestClient implements AutoCloseable {
     public TestClient(Socket socket) throws IOException {
         this.socket = socket;
 
-        reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+        reader =
+                new BufferedReader(
+                        new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
 
-        writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
+        writer =
+                new BufferedWriter(
+                        new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
     }
 
     public void send(String message) throws IOException {

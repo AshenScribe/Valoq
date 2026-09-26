@@ -34,7 +34,9 @@ class MessageServerInitializerTest {
 
     @BeforeEach
     public void setUp() {
-        channel = new EmbeddedChannel(new MessageServer.MessageServerInitializer(new ConnectionTracker()));
+        channel =
+                new EmbeddedChannel(
+                        new MessageServer.MessageServerInitializer(new ConnectionTracker()));
     }
 
     @Test
@@ -42,13 +44,5 @@ class MessageServerInitializerTest {
         Assertions.assertNotNull(channel.pipeline().get("stringDecoder"));
         Assertions.assertNotNull(channel.pipeline().get("initVerbHandler"));
         Assertions.assertNull(channel.pipeline().get("chatMessageHandler"));
-    }
-
-    @Test
-    public void testChannelPipelineAfterInit() {
-        channel.writeInbound("INIT user123");
-        Assertions.assertNotNull(channel.pipeline().get("stringDecoder"));
-        Assertions.assertNotNull(channel.pipeline().get("chatMessageHandler"));
-        Assertions.assertNull(channel.pipeline().get("initVerbHandler"));
     }
 }

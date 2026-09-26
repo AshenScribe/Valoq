@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module external.linked.project.id="auth-service:main" external.linked.project.path="$MODULE_DIR$/../../auth-service" external.root.project.path="$MODULE_DIR$/../../auth-service" external.system.id="GRADLE" external.system.module.group="" external.system.module.type="sourceSet" external.system.module.version="unspecified" type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_25">
+    <output url="file://$MODULE_DIR$/../../auth-service/build/classes/java/main" />
+    <exclude-output />
+    <content url="file://$MODULE_DIR$/../../auth-service/build/generated/dev-keys">
+      <sourceFolder url="file://$MODULE_DIR$/../../auth-service/build/generated/dev-keys" type="java-resource" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../auth-service/src/main">
+      <sourceFolder url="file://$MODULE_DIR$/../../auth-service/src/main/java" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../auth-service/src/main/resources" type="java-resource" />
+    </content>
+    <orderEntry type="jdk" jdkName="ms-25" jdkType="JavaSDK" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-buffer:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-transport:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-common:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-codec:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-transport-native-epoll:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-transport-native-epoll:linux-x86_64:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-handler:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: org.slf4j:slf4j-api:2.0.19" level="project" />
+    <orderEntry type="library" name="Gradle: org.slf4j:slf4j-simple:2.0.19" level="project" />
+    <orderEntry type="library" name="Gradle: io.jsonwebtoken:jjwt-api:0.13.0" level="project" />
+    <orderEntry type="library" name="Gradle: org.yaml:snakeyaml:2.7" level="project" />
+    <orderEntry type="library" name="Gradle: com.zaxxer:HikariCP:7.1.0" level="project" />
+    <orderEntry type="library" name="Gradle: com.h2database:h2:2.5.250" level="project" />
+    <orderEntry type="library" name="Gradle: at.favre.lib:bcrypt:0.10.2" level="project" />
+    <orderEntry type="library" name="Gradle: com.fasterxml.jackson.core:jackson-databind:2.22.2" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-resolver:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-codec-base:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-codec-compression:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-codec-protobuf:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-codec-marshalling:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-transport-native-unix-common:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.netty:netty-transport-classes-epoll:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: at.favre.lib:bytes:1.5.0" level="project" />
+    <orderEntry type="library" name="Gradle: com.fasterxml.jackson.core:jackson-annotations:2.22" level="project" />
+    <orderEntry type="library" name="Gradle: com.fasterxml.jackson.core:jackson-core:2.22.2" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Gradle: io.jsonwebtoken:jjwt-impl:0.13.0" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Gradle: io.jsonwebtoken:jjwt-jackson:0.13.0" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Gradle: org.postgresql:postgresql:42.7.13" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Gradle: org.checkerframework:checker-qual:3.55.1" level="project" />
+  </component>
+</module>

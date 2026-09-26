@@ -36,11 +36,12 @@ import server.model.User;
 public class PostgresDatabase {
 
     @Container
-    public static PostgreSQLContainer container = new PostgreSQLContainer("postgres:15.3")
-            .withDatabaseName("testdb")
-            .withUsername("testuser")
-            .withPassword("testpass")
-            .withInitScript("init.sql");
+    public static PostgreSQLContainer container =
+            new PostgreSQLContainer("postgres:15.3")
+                    .withDatabaseName("testdb")
+                    .withUsername("testuser")
+                    .withPassword("testpass")
+                    .withInitScript("init.sql");
 
     public static ServerConfig getServerConfig() {
         ServerConfig serverConfig = new ServerConfig();
@@ -53,7 +54,8 @@ public class PostgresDatabase {
     }
 
     Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(container.getJdbcUrl(), container.getUsername(), container.getPassword());
+        return DriverManager.getConnection(
+                container.getJdbcUrl(), container.getUsername(), container.getPassword());
     }
 
     public void resetDatabase() {

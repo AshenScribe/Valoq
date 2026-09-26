@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: io.netty:netty-codec-protobuf:4.2.18.Final" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="io.netty" artifactId="netty-codec-protobuf" version="4.2.18.Final" baseVersion="4.2.18.Final" />
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../.gradle/caches/modules-2/files-2.1/io.netty/netty-codec-protobuf/4.2.18.Final/938321fed641687191a2f63662b413cb1566f62f/netty-codec-protobuf-4.2.18.Final.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/../.gradle/caches/modules-2/files-2.1/io.netty/netty-codec-protobuf/4.2.18.Final/1132129965766db0cba8ee6b4aa0488d1824d027/netty-codec-protobuf-4.2.18.Final-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

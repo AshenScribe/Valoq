@@ -50,35 +50,83 @@ public class MessageTestClient implements AutoCloseable {
     private final EventLoopGroup group;
     private final Channel channel;
     private final BlockingQueue<String> responses = new LinkedBlockingQueue<>();
+    private final java.security.PrivateKey privateKey;
 
-    public MessageTestClient(String host, int port) throws InterruptedException {
-        this.group = new MultiThreadIoEventLoopGroup(
-                Epoll.isAvailable() ? EpollIoHandler.newFactory() : NioIoHandler.newFactory());
+    public MessageTestClient(String host, int port, java.security.PrivateKey privateKey)
+            throws InterruptedException {
+        this.privateKey = privateKey;
+        this.group =
+                new MultiThreadIoEventLoopGroup(
+                        Epoll.isAvailable()
+                                ? EpollIoHandler.newFactory()
+                                : NioIoHandler.newFactory());
 
-        Bootstrap b = new Bootstrap()
-                .group(group)
-                .channel(Epoll.isAvailable() ? EpollSocketChannel.class : NioSocketChannel.class)
-                .handler(new ChannelInitializer<SocketChannel>() {
-                    @Override
-                    protected void initChannel(SocketChannel ch) {
-                        ch.pipeline().addLast(new LineBasedFrameDecoder(1024));
-                        ch.pipeline().addLast(new StringDecoder(StandardCharsets.UTF_8));
-                        ch.pipeline().addLast(new StringEncoder(StandardCharsets.UTF_8));
-                        ch.pipeline().addLast(new SimpleChannelInboundHandler<String>() {
-                            @Override
-                            protected void channelRead0(ChannelHandlerContext ctx, String msg) {
-                                responses.offer(msg);
-                            }
-                        });
-                    }
-                });
+        Bootstrap b =
+                new Bootstrap()
+                        .group(group)
+                        .channel(
+                                Epoll.isAvailable()
+                                        ? EpollSocketChannel.class
+                                        : NioSocketChannel.class)
+                        .handler(
+                                new ChannelInitializer<SocketChannel>() {
+                                    @Override
+                                    protected void initChannel(SocketChannel ch) {
+                                        ch.pipeline().addLast(new LineBasedFrameDecoder(1024));
+                                        ch.pipeline()
+                                                .addLast(new StringDecoder(StandardCharsets.UTF_8));
+                                        ch.pipeline()
+                                                .addLast(new StringEncoder(StandardCharsets.UTF_8));
+                                        ch.pipeline()
+                                                .addLast(
+                                                        new SimpleChannelInboundHandler<String>() {
+                                                            @Override
+                                                            protected void channelRead0(
+                                                                    ChannelHandlerContext ctx,
+                                                                    String msg) {
+                                                                responses.offer(msg);
+                                                            }
+                                                        });
+                                    }
+                                });
 
         this.channel = b.connect(host, port).sync().channel();
     }
 
     public String init(String userId) {
-        send("INIT " + userId);
+        String token;
+        try {
+            token = createToken(userId);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        send("INIT " + token);
         return readLine();
+    }
+
+    public String createToken(String userId) throws Exception {
+        String header =
+                java.util.Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString(
+                                "{\"alg\":\"RS256\",\"typ\":\"JWT\"}"
+                                        .getBytes(StandardCharsets.UTF_8));
+        String payload =
+                java.util.Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString(
+                                ("{\"sub\":\"" + userId + "\"}").getBytes(StandardCharsets.UTF_8));
+
+        String contentToSign = header + "." + payload;
+
+        java.security.Signature signature = java.security.Signature.getInstance("SHA256withRSA");
+        signature.initSign(privateKey);
+        signature.update(contentToSign.getBytes(StandardCharsets.UTF_8));
+
+        String sigBase64 =
+                java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(signature.sign());
+
+        return contentToSign + "." + sigBase64;
     }
 
     public void sendTo(String recipientId, String base64Payload) {
@@ -100,8 +148,7 @@ public class MessageTestClient implements AutoCloseable {
 
     public void send(String command) {
         try {
-            channel.writeAndFlush(command.endsWith("\n") ? command : command + "\n")
-                    .sync();
+            channel.writeAndFlush(command.endsWith("\n") ? command : command + "\n").sync();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
