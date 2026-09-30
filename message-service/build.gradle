@@ -27,13 +27,13 @@ dependencies {
 
     implementation "${libs.netty.transport.native.epoll.get().module}:$epollClassifier"
 
-
     testImplementation libs.bundles.testing.suite
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${libs.versions.junit.get()}"
     testRuntimeOnly libs.junit.platform.launcher
 
     implementation libs.owner
 
+    implementation libs.mockito.core
     implementation libs.cassandra.driver
     e2eTestImplementation libs.testcontainers.junit
     e2eTestImplementation libs.testcontainers.cassandra

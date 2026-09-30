@@ -26,40 +26,44 @@ package database;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
-import com.datastax.oss.driver.api.core.uuid.Uuids;
-import java.time.Instant;
+import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 
-public class MessageRepository {
+public class EventRepository {
 
     private final CqlSession session;
     private final PreparedStatement insertStatement;
 
-    public MessageRepository() {
+    public EventRepository() {
         this(CassandraManager.getSession());
     }
 
-    public MessageRepository(CqlSession session) {
+    public EventRepository(CqlSession session) {
         this.session = session;
         this.insertStatement =
                 session.prepare(
-                        """
-                    INSERT INTO messages (conversation_id, message_id, sender_id, recipient_id, payload, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """);
+                        "INSERT INTO events (conversation_id, time_bucket, hash_bucket, event_id, event_type, actor_id, entity_id, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     }
 
-    public CompletionStage<AsyncResultSet> saveMessageAsync(
-            String senderId, String recipientId, String payload) {
-        String conversationId = getConversationId(senderId, recipientId);
-        Instant now = Instant.now();
+    public CompletionStage<AsyncResultSet> saveEvent(
+            String conversationId,
+            String timeBucket,
+            int hashBucket,
+            UUID eventId,
+            String eventType,
+            String actorId,
+            String entityId,
+            String payload) {
 
         return session.executeAsync(
                 insertStatement.bind(
-                        conversationId, Uuids.timeBased(), senderId, recipientId, payload, now));
-    }
-
-    public static String getConversationId(String user1, String user2) {
-        return user1.compareTo(user2) < 0 ? user1 + ":" + user2 : user2 + ":" + user1;
+                        conversationId,
+                        timeBucket,
+                        hashBucket,
+                        eventId,
+                        eventType,
+                        actorId,
+                        entityId,
+                        payload));
     }
 }

@@ -23,45 +23,160 @@
  */
 package server;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import database.ConversationMemberRepository;
+import database.EventRepository;
 import io.netty.channel.DefaultChannelId;
 import io.netty.channel.embedded.EmbeddedChannel;
-import org.junit.jupiter.api.Assertions;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import server.model.Event;
+import server.model.EventType;
 
 class MessageRouterTest {
 
     private ConnectionTracker connectionTracker;
+    private EventRepository eventRepository;
+    private ConversationMemberRepository memberRepository;
     private MessageRouter messageRouter;
 
     @BeforeEach
     void setUp() {
         connectionTracker = new ConnectionTracker();
-        messageRouter = new MessageRouter(connectionTracker);
+        eventRepository = mock(EventRepository.class);
+        memberRepository = mock(ConversationMemberRepository.class);
+
+        messageRouter = new MessageRouter(connectionTracker, eventRepository, memberRepository);
     }
 
     @Test
     void testRouteSuccess() {
-        EmbeddedChannel recipientChannel = new EmbeddedChannel(DefaultChannelId.newInstance());
-        connectionTracker.register("bob", recipientChannel);
-        boolean result = messageRouter.route("alice", "bob", "SGVsbG8=");
-        Assertions.assertTrue(result);
-        Assertions.assertEquals("FROM alice SGVsbG8=", recipientChannel.readOutbound());
+        EmbeddedChannel aliceChannel = new EmbeddedChannel(DefaultChannelId.newInstance());
+
+        EmbeddedChannel bobChannel = new EmbeddedChannel(DefaultChannelId.newInstance());
+
+        connectionTracker.register("alice", aliceChannel);
+        connectionTracker.register("bob", bobChannel);
+
+        Event event =
+                new Event(
+                        "alice",
+                        "conversation-123",
+                        "550e8400-e29b-41d4-a716-446655440000",
+                        EventType.MESSAGE_CREATED,
+                        "SGVsbG8=",
+                        Instant.parse("2026-09-30T17:30:00Z"));
+
+        when(memberRepository.findMemberIds("conversation-123"))
+                .thenReturn(List.of("alice", "bob"));
+
+        when(eventRepository.saveEvent(
+                        anyString(),
+                        anyString(),
+                        anyInt(),
+                        any(UUID.class),
+                        anyString(),
+                        anyString(),
+                        nullable(String.class),
+                        anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        messageRouter.route(event).toCompletableFuture().join();
+
+        String message = bobChannel.readOutbound();
+
+        assertNotNull(message);
+        assertTrue(message.startsWith("EVENT MESSAGE_CREATED "));
+        assertTrue(message.contains("conversation-123"));
+        assertTrue(message.contains("alice"));
+        assertTrue(message.endsWith("SGVsbG8="));
     }
 
     @Test
-    void testRouteFailureRecipientNotConnected() {
-        boolean result = messageRouter.route("alice", "bob", "SGVsbG8=");
-        Assertions.assertFalse(result);
-        Assertions.assertNull(connectionTracker.get("bob"));
+    void testRouteOfflineMemberDoesNotFail() {
+        EmbeddedChannel aliceChannel = new EmbeddedChannel(DefaultChannelId.newInstance());
+
+        connectionTracker.register("alice", aliceChannel);
+
+        Event event =
+                new Event(
+                        "alice",
+                        "conversation-123",
+                        "550e8400-e29b-41d4-a716-446655440002",
+                        EventType.MESSAGE_CREATED,
+                        "SGVsbG8=",
+                        Instant.parse("2026-09-30T17:30:00Z"));
+
+        when(memberRepository.findMemberIds("conversation-123"))
+                .thenReturn(List.of("alice", "bob"));
+
+        when(eventRepository.saveEvent(
+                        anyString(),
+                        anyString(),
+                        anyInt(),
+                        any(UUID.class),
+                        anyString(),
+                        anyString(),
+                        nullable(String.class),
+                        anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        assertDoesNotThrow(() -> messageRouter.route(event).toCompletableFuture().join());
+
+        assertNull(connectionTracker.get("bob"));
+        assertNotNull(aliceChannel.readOutbound());
     }
 
     @Test
     void testRouteSelfMessage() {
         EmbeddedChannel aliceChannel = new EmbeddedChannel(DefaultChannelId.newInstance());
+
         connectionTracker.register("alice", aliceChannel);
-        boolean result = messageRouter.route("alice", "alice", "U2VsZi1tZXNzYWdl");
-        Assertions.assertTrue(result);
-        Assertions.assertEquals("FROM alice U2VsZi1tZXNzYWdl", aliceChannel.readOutbound());
+
+        Event event =
+                new Event(
+                        "alice",
+                        "conversation-123",
+                        "550e8400-e29b-41d4-a716-446655440001",
+                        EventType.MESSAGE_CREATED,
+                        "U2VsZi1tZXNzYWdl",
+                        Instant.parse("2026-09-30T17:30:00Z"));
+
+        when(memberRepository.findMemberIds("conversation-123")).thenReturn(List.of("alice"));
+
+        when(eventRepository.saveEvent(
+                        anyString(),
+                        anyString(),
+                        anyInt(),
+                        any(UUID.class),
+                        anyString(),
+                        anyString(),
+                        nullable(String.class),
+                        anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        messageRouter.route(event).toCompletableFuture().join();
+
+        String message = aliceChannel.readOutbound();
+
+        assertNotNull(message);
+        assertTrue(message.startsWith("EVENT MESSAGE_CREATED "));
+        assertTrue(message.contains("conversation-123"));
+        assertTrue(message.contains("alice"));
+        assertTrue(message.endsWith("U2VsZi1tZXNzYWdl"));
     }
 }

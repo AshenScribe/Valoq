@@ -25,15 +25,24 @@ package server.handler;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import java.time.Instant;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import server.MessageRouter;
 import server.MessageServer;
 import server.Session;
+import server.model.Event;
+import server.model.EventType;
 
+/**
+ * Handler for processing chat messages sent by clients. It listens for messages in the format "SEND
+ * <recipientId> <client_created_at> <payload></payload>" and routes them to the appropriate
+ * recipients using the MessageRouter.
+ */
 public class ChatMessageHandler extends SimpleChannelInboundHandler<String> {
 
-    private static final Pattern SEND_PATTERN = Pattern.compile("^SEND ([^\\s]{1,64}) ([^\\s]+)$");
+    private static final Pattern SEND_PATTERN =
+            Pattern.compile("^SEND ([^\\s]{1,128}) ([^\\s]+) ([^\\s]+) ([^\\s]+)$");
     private final MessageRouter messageRouter;
 
     public ChatMessageHandler(MessageRouter messageRouter) {
@@ -42,13 +51,13 @@ public class ChatMessageHandler extends SimpleChannelInboundHandler<String> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, String msg) {
-        final Matcher matcher = SEND_PATTERN.matcher(msg);
+        Matcher matcher = SEND_PATTERN.matcher(msg);
         if (!matcher.matches()) {
             ctx.writeAndFlush("ERROR Invalid SEND format");
             return;
         }
 
-        final Session session =
+        Session session =
                 ctx.channel().attr(MessageServer.MessageServerInitializer.SESSION_KEY).get();
 
         if (session == null || session.getUserId() == null) {
@@ -56,11 +65,19 @@ public class ChatMessageHandler extends SimpleChannelInboundHandler<String> {
             return;
         }
 
-        boolean delivered =
-                messageRouter.route(session.getUserId(), matcher.group(1), matcher.group(2));
-
-        if (!delivered) {
-            ctx.writeAndFlush("ERROR Recipient not connected");
-        }
+        String senderId = session.getUserId();
+        String conversationId = matcher.group(1);
+        String clientMessageId = matcher.group(2);
+        String timestamp = matcher.group(3);
+        String payload = matcher.group(4);
+        Event event =
+                new Event(
+                        senderId,
+                        conversationId,
+                        clientMessageId,
+                        EventType.MESSAGE_CREATED,
+                        payload,
+                        Instant.parse(timestamp));
+        messageRouter.route(event);
     }
 }

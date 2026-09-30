@@ -23,6 +23,10 @@
  */
 package server.handler;
 
+import static org.mockito.Mockito.mock;
+
+import database.ConversationMemberRepository;
+import database.EventRepository;
 import io.netty.channel.DefaultChannelId;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.nio.charset.StandardCharsets;
@@ -39,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import server.ConnectionTracker;
+import server.MessageRouter;
 import server.MessageServer;
 import server.Session;
 import server.TestKeyManager;
@@ -46,9 +51,13 @@ import server.TestKeyManager;
 class InitVerbHandlerTest {
 
     private static KeyPair keyPair;
+
     private EmbeddedChannel channel;
     private Session session;
-    private final ConnectionTracker connectionTracker = new ConnectionTracker();
+    private ConnectionTracker connectionTracker;
+
+    private EventRepository eventRepository;
+    private ConversationMemberRepository memberRepository;
 
     @BeforeAll
     static void initJwtKey() throws Exception {
@@ -56,41 +65,61 @@ class InitVerbHandlerTest {
 
         String publicKeyBase64 =
                 Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded());
+
         JwtUtil.getInstance().init(publicKeyBase64);
     }
 
     @BeforeEach
     void setUp() {
         channel = new EmbeddedChannel(DefaultChannelId.newInstance());
+
         session = new Session();
+
+        connectionTracker = new ConnectionTracker();
+
+        eventRepository = mock(EventRepository.class);
+        memberRepository = mock(ConversationMemberRepository.class);
+
         channel.attr(MessageServer.MessageServerInitializer.SESSION_KEY).set(session);
-        channel.pipeline().addLast(new InitVerbHandler(connectionTracker));
+
+        MessageRouter messageRouter =
+                new MessageRouter(connectionTracker, eventRepository, memberRepository);
+
+        channel.pipeline().addLast(new InitVerbHandler(connectionTracker, messageRouter));
     }
 
     @Test
     public void successOnValidJwtToken() throws Exception {
         String expectedUserId = "user123";
+
         String validJwt =
                 createJwtToken("{\"sub\":\"" + expectedUserId + "\"}", keyPair.getPrivate());
 
         channel.writeInbound("INIT " + validJwt);
 
         Assertions.assertEquals("SUCCESS", channel.readOutbound());
+
         Assertions.assertEquals(expectedUserId, session.getUserId());
+
         Assertions.assertTrue(channel.isOpen());
+
         Assertions.assertEquals(channel, connectionTracker.get(expectedUserId));
     }
 
     @Test
     public void failOnInvalidJwtSignature() throws Exception {
         KeyPair wrongKeyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+
         String invalidJwt = createJwtToken("{\"sub\":\"user123\"}", wrongKeyPair.getPrivate());
 
         channel.writeInbound("INIT " + invalidJwt);
 
         Assertions.assertEquals("INVALID", channel.readOutbound());
+
         Assertions.assertNull(session.getUserId());
+
         Assertions.assertFalse(channel.isOpen());
+
         Assertions.assertEquals(0, connectionTracker.getSize());
     }
 
@@ -107,22 +136,28 @@ class InitVerbHandlerTest {
                 "INIT malformed.jwt.token"
             })
     public void failOnIncorrectFormatOrBadToken(String input) {
+
         channel.writeInbound(input);
 
         Assertions.assertEquals("INVALID", channel.readOutbound());
+
         Assertions.assertNull(session.getUserId());
+
         Assertions.assertFalse(channel.isOpen());
+
         Assertions.assertEquals(0, connectionTracker.getSize());
     }
 
     private static String createJwtToken(String jsonPayload, PrivateKey privateKey)
             throws Exception {
+
         String header =
                 Base64.getUrlEncoder()
                         .withoutPadding()
                         .encodeToString(
                                 "{\"alg\":\"RS256\",\"typ\":\"JWT\"}"
                                         .getBytes(StandardCharsets.UTF_8));
+
         String payload =
                 Base64.getUrlEncoder()
                         .withoutPadding()
@@ -131,7 +166,9 @@ class InitVerbHandlerTest {
         String contentToSign = header + "." + payload;
 
         Signature signature = Signature.getInstance("SHA256withRSA");
+
         signature.initSign(privateKey);
+
         signature.update(contentToSign.getBytes(StandardCharsets.UTF_8));
 
         String sigBase64 = Base64.getUrlEncoder().withoutPadding().encodeToString(signature.sign());

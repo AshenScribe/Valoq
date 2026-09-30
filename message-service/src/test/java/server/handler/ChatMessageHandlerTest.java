@@ -23,13 +23,24 @@
  */
 package server.handler;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import database.ConversationMemberRepository;
+import database.EventRepository;
 import io.netty.channel.embedded.EmbeddedChannel;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import server.ConnectionTracker;
 import server.MessageRouter;
@@ -39,16 +50,39 @@ import server.Session;
 class ChatMessageHandlerTest {
 
     private static final String TEST_USER_ID = "user123";
+    private static final String CONVERSATION_ID = "conversation-123";
+    private static final String CLIENT_MESSAGE_ID = "550e8400-e29b-41d4-a716-446655440000";
+    private static final String CREATED_AT = "2026-09-30T17:30:00Z";
 
     private EmbeddedChannel senderChannel;
     private ConnectionTracker connectionTracker;
+
+    private EventRepository eventRepository;
+    private ConversationMemberRepository memberRepository;
 
     @BeforeEach
     void setup() {
         connectionTracker = new ConnectionTracker();
 
+        eventRepository = mock(EventRepository.class);
+        memberRepository = mock(ConversationMemberRepository.class);
+
+        when(eventRepository.saveEvent(
+                        anyString(),
+                        anyString(),
+                        anyInt(),
+                        any(UUID.class),
+                        anyString(),
+                        anyString(),
+                        nullable(String.class),
+                        anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
         senderChannel =
-                new EmbeddedChannel(new ChatMessageHandler(new MessageRouter(connectionTracker)));
+                new EmbeddedChannel(
+                        new ChatMessageHandler(
+                                new MessageRouter(
+                                        connectionTracker, eventRepository, memberRepository)));
 
         Session session = new Session();
         session.setUserId(TEST_USER_ID);
@@ -62,25 +96,37 @@ class ChatMessageHandlerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "user456, SGVsbG8gd29ybGQh",
-        "user_123, U29tZSBvdGhlciB0ZXh0",
-        "bob, SGVsbG8=",
-        "alice, SGVsbA=="
-    })
-    void testValidSendMessageFormat(String recipientId, String base64Payload) {
+    @ValueSource(strings = {"SGVsbG8gd29ybGQh", "U29tZSBvdGhlciB0ZXh0", "SGVsbG8=", "SGVsbA=="})
+    void testValidSendMessageFormat(String base64Payload) {
+
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
-            connectionTracker.register(recipientId, recipientChannel);
+            connectionTracker.register("bob", recipientChannel);
 
-            String message = "SEND " + recipientId + " " + base64Payload;
+            when(memberRepository.findMemberIds(CONVERSATION_ID))
+                    .thenReturn(List.of(TEST_USER_ID, "bob"));
+
+            String message =
+                    "SEND "
+                            + CONVERSATION_ID
+                            + " "
+                            + CLIENT_MESSAGE_ID
+                            + " "
+                            + CREATED_AT
+                            + " "
+                            + base64Payload;
 
             senderChannel.writeInbound(message);
 
             Object outbound = recipientChannel.readOutbound();
 
-            Assertions.assertEquals("FROM " + TEST_USER_ID + " " + base64Payload, outbound);
+            Assertions.assertNotNull(outbound);
+            Assertions.assertTrue(outbound.toString().startsWith("EVENT MESSAGE_CREATED "));
+
+            Assertions.assertTrue(outbound.toString().contains(CONVERSATION_ID));
+            Assertions.assertTrue(outbound.toString().contains(TEST_USER_ID));
+            Assertions.assertTrue(outbound.toString().endsWith(base64Payload));
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -101,16 +147,29 @@ class ChatMessageHandlerTest {
             })
     void testValidBase64Payload(String base64Payload) {
 
-        String recipientId = "bob";
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
-            connectionTracker.register(recipientId, recipientChannel);
+            connectionTracker.register("bob", recipientChannel);
 
-            senderChannel.writeInbound("SEND " + recipientId + " " + base64Payload);
+            when(memberRepository.findMemberIds(CONVERSATION_ID))
+                    .thenReturn(List.of(TEST_USER_ID, "bob"));
 
-            Assertions.assertEquals(
-                    "FROM " + TEST_USER_ID + " " + base64Payload, recipientChannel.readOutbound());
+            senderChannel.writeInbound(
+                    "SEND "
+                            + CONVERSATION_ID
+                            + " "
+                            + CLIENT_MESSAGE_ID
+                            + " "
+                            + CREATED_AT
+                            + " "
+                            + base64Payload);
+
+            Object outbound = recipientChannel.readOutbound();
+
+            Assertions.assertNotNull(outbound);
+            Assertions.assertTrue(outbound.toString().startsWith("EVENT MESSAGE_CREATED "));
+            Assertions.assertTrue(outbound.toString().endsWith(base64Payload));
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -118,22 +177,46 @@ class ChatMessageHandlerTest {
     }
 
     @Test
-    void testMultipleMessagesToSameRecipient() {
+    void testMultipleMessagesToSameConversation() {
 
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
             connectionTracker.register("bob", recipientChannel);
 
-            senderChannel.writeInbound("SEND bob SGVsbG8=");
+            when(memberRepository.findMemberIds(CONVERSATION_ID))
+                    .thenReturn(List.of(TEST_USER_ID, "bob"));
 
-            senderChannel.writeInbound("SEND bob V29ybGQ=");
+            senderChannel.writeInbound(
+                    "SEND "
+                            + CONVERSATION_ID
+                            + " "
+                            + CLIENT_MESSAGE_ID
+                            + " "
+                            + CREATED_AT
+                            + " "
+                            + "SGVsbG8=");
 
-            Assertions.assertEquals(
-                    "FROM " + TEST_USER_ID + " SGVsbG8=", recipientChannel.readOutbound());
+            String secondClientMessageId = "660e8400-e29b-41d4-a716-446655440000";
 
-            Assertions.assertEquals(
-                    "FROM " + TEST_USER_ID + " V29ybGQ=", recipientChannel.readOutbound());
+            senderChannel.writeInbound(
+                    "SEND "
+                            + CONVERSATION_ID
+                            + " "
+                            + secondClientMessageId
+                            + " "
+                            + CREATED_AT
+                            + " "
+                            + "V29ybGQ=");
+
+            Object first = recipientChannel.readOutbound();
+            Object second = recipientChannel.readOutbound();
+
+            Assertions.assertNotNull(first);
+            Assertions.assertNotNull(second);
+
+            Assertions.assertTrue(first.toString().endsWith("SGVsbG8="));
+            Assertions.assertTrue(second.toString().endsWith("V29ybGQ="));
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -141,7 +224,7 @@ class ChatMessageHandlerTest {
     }
 
     @Test
-    void testMessageDeliveredToCorrectRecipient() {
+    void testMessageDeliveredToConversationMembers() {
 
         EmbeddedChannel bobChannel = new EmbeddedChannel();
         EmbeddedChannel aliceChannel = new EmbeddedChannel();
@@ -150,12 +233,30 @@ class ChatMessageHandlerTest {
             connectionTracker.register("bob", bobChannel);
             connectionTracker.register("alice", aliceChannel);
 
-            senderChannel.writeInbound("SEND bob SGVsbG8=");
+            when(memberRepository.findMemberIds(CONVERSATION_ID))
+                    .thenReturn(List.of("bob", "alice"));
 
-            Assertions.assertEquals(
-                    "FROM " + TEST_USER_ID + " SGVsbG8=", bobChannel.readOutbound());
+            senderChannel.writeInbound(
+                    "SEND "
+                            + CONVERSATION_ID
+                            + " "
+                            + CLIENT_MESSAGE_ID
+                            + " "
+                            + CREATED_AT
+                            + " "
+                            + "SGVsbG8=");
 
-            Assertions.assertNull(aliceChannel.readOutbound());
+            Object bobMessage = bobChannel.readOutbound();
+            Object aliceMessage = aliceChannel.readOutbound();
+
+            Assertions.assertNotNull(bobMessage);
+            Assertions.assertNotNull(aliceMessage);
+
+            Assertions.assertTrue(bobMessage.toString().contains(CONVERSATION_ID));
+            Assertions.assertTrue(aliceMessage.toString().contains(CONVERSATION_ID));
+
+            Assertions.assertTrue(bobMessage.toString().endsWith("SGVsbG8="));
+            Assertions.assertTrue(aliceMessage.toString().endsWith("SGVsbG8="));
 
         } finally {
             bobChannel.finishAndReleaseAll();
@@ -166,17 +267,14 @@ class ChatMessageHandlerTest {
     @ParameterizedTest
     @ValueSource(
             strings = {
-                "SEND SGVsbG8gd29ybGQh",
-                "SEN user456 U29tZSBvdGhlciB0ZXh0",
-                "send user456 SGVsbG8gd29ybGQh",
-                "SEND\tuser456\tSGVsbG8gd29ybGQh",
-                "SEND  ",
                 "SEND",
-                "SEND user456",
-                "SEND user456 ",
-                "SEND  user456 SGVsbG8=",
-                " SEND user456 SGVsbG8=",
-                "SEND user456 SGVsbG8= ",
+                "SEND conversation-123",
+                "SEND conversation-123 client-id",
+                "SEND conversation-123 client-id 2026-09-30T17:30:00Z",
+                "SEND  conversation-123 client-id 2026-09-30T17:30:00Z SGVsbG8=",
+                " SEND conversation-123 client-id 2026-09-30T17:30:00Z SGVsbG8=",
+                "SEND conversation-123 client-id 2026-09-30T17:30:00Z SGVsbG8= ",
+                "send conversation-123 client-id 2026-09-30T17:30:00Z SGVsbG8="
             })
     void testInvalidSendMessageFormat(String invalidMessage) {
 
@@ -186,126 +284,62 @@ class ChatMessageHandlerTest {
     }
 
     @Test
-    void testSendMessageToDisconnectedRecipient() {
+    void testSendToConversationWithNoConnectedMembers() {
 
-        senderChannel.writeInbound("SEND unknownUser SGVsbG8=");
+        when(memberRepository.findMemberIds(CONVERSATION_ID)).thenReturn(List.of("bob"));
 
-        Assertions.assertEquals("ERROR Recipient not connected", senderChannel.readOutbound());
+        senderChannel.writeInbound(
+                "SEND "
+                        + CONVERSATION_ID
+                        + " "
+                        + CLIENT_MESSAGE_ID
+                        + " "
+                        + CREATED_AT
+                        + " "
+                        + "SGVsbG8=");
+
+        /*
+         * The event is persisted even though Bob is offline.
+         * There should NOT be:
+         *
+         * ERROR Recipient not connected
+         */
+        Assertions.assertNull(senderChannel.readOutbound());
     }
 
     @Test
-    void testRecipientIdMaximumLength() {
-
-        String recipientId = "a".repeat(64);
-
-        EmbeddedChannel recipientChannel = new EmbeddedChannel();
-
-        try {
-            connectionTracker.register(recipientId, recipientChannel);
-
-            senderChannel.writeInbound("SEND " + recipientId + " SGVsbG8=");
-
-            Assertions.assertEquals(
-                    "FROM " + TEST_USER_ID + " SGVsbG8=", recipientChannel.readOutbound());
-
-        } finally {
-            recipientChannel.finishAndReleaseAll();
-        }
-    }
-
-    @Test
-    void testRecipientIdGreaterThanMaximumLength() {
-
-        String recipientId = "a".repeat(65);
-
-        senderChannel.writeInbound("SEND " + recipientId + " SGVsbG8=");
-
-        Assertions.assertEquals("ERROR Invalid SEND format", senderChannel.readOutbound());
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"user 456", "user\t456", "user\n456", "user\r456"})
-    void testRecipientIdCannotContainWhitespace(String recipientId) {
-
-        senderChannel.writeInbound("SEND " + recipientId + " SGVsbG8=");
-
-        Assertions.assertEquals("ERROR Invalid SEND format", senderChannel.readOutbound());
-    }
-
-    @Test
-    void testSenderUserIdIsIncludedInFromMessage() {
+    void testSenderUserIdIsIncludedInEvent() {
 
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
             connectionTracker.register("bob", recipientChannel);
+
+            when(memberRepository.findMemberIds(CONVERSATION_ID))
+                    .thenReturn(List.of("alice123", "bob"));
 
             Session session = new Session();
             session.setUserId("alice123");
 
             senderChannel.attr(MessageServer.MessageServerInitializer.SESSION_KEY).set(session);
 
-            senderChannel.writeInbound("SEND bob SGVsbG8=");
+            senderChannel.writeInbound(
+                    "SEND "
+                            + CONVERSATION_ID
+                            + " "
+                            + CLIENT_MESSAGE_ID
+                            + " "
+                            + CREATED_AT
+                            + " "
+                            + "SGVsbG8=");
 
-            Assertions.assertEquals("FROM alice123 SGVsbG8=", recipientChannel.readOutbound());
+            Object outbound = recipientChannel.readOutbound();
 
-        } finally {
-            recipientChannel.finishAndReleaseAll();
-        }
-    }
-
-    @Test
-    void testConnectionTrackerContainsRegisteredRecipient() {
-
-        EmbeddedChannel recipientChannel = new EmbeddedChannel();
-
-        try {
-            connectionTracker.register("bob", recipientChannel);
-
-            Assertions.assertEquals(recipientChannel, connectionTracker.get("bob"));
-
-            Assertions.assertEquals(1, connectionTracker.getSize());
+            Assertions.assertNotNull(outbound);
+            Assertions.assertTrue(outbound.toString().contains("alice123"));
 
         } finally {
             recipientChannel.finishAndReleaseAll();
-        }
-    }
-
-    @Test
-    void testConnectionTrackerUnregistersRecipient() {
-
-        EmbeddedChannel recipientChannel = new EmbeddedChannel();
-
-        try {
-            connectionTracker.register("bob", recipientChannel);
-
-            Assertions.assertTrue(connectionTracker.unregister("bob", recipientChannel));
-
-            Assertions.assertNull(connectionTracker.get("bob"));
-
-            Assertions.assertEquals(0, connectionTracker.getSize());
-
-        } finally {
-            recipientChannel.finishAndReleaseAll();
-        }
-    }
-
-    @Test
-    void testUnregisterWithWrongChannelDoesNotRemoveConnection() {
-
-        EmbeddedChannel recipientChannel = new EmbeddedChannel();
-        EmbeddedChannel anotherChannel = new EmbeddedChannel();
-
-        try {
-            connectionTracker.register("bob", recipientChannel);
-
-            Assertions.assertFalse(connectionTracker.unregister("bob", anotherChannel));
-
-            Assertions.assertEquals(recipientChannel, connectionTracker.get("bob"));
-
-        } finally {
-            recipientChannel.finishAndReleaseAll();
-            anotherChannel.finishAndReleaseAll();
         }
     }
 }

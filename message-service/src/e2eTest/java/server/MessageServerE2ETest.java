@@ -27,12 +27,17 @@ import base.BaseIntegrationTest;
 import client.MessageTestClient;
 import com.datastax.oss.driver.api.core.cql.Row;
 import java.time.Duration;
+import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 class MessageServerE2ETest extends BaseIntegrationTest {
+
+    private static final String CONVERSATION_ID = "conversation-e2e";
+
+    private static final String CREATED_AT = "2026-09-30T17:30:00Z";
 
     @Nested
     @DisplayName("Core Routing & Cassandra Persistence")
@@ -41,54 +46,126 @@ class MessageServerE2ETest extends BaseIntegrationTest {
         @Test
         @DisplayName("End-to-end messaging routes between online clients and persists to Cassandra")
         void endToEndMessagingAndPersistenceFlow() throws Exception {
+
+            addConversationMembers(CONVERSATION_ID, "alice", "bob");
+
             try (MessageTestClient alice = connect();
                     MessageTestClient bob = connect()) {
 
                 Assertions.assertEquals("SUCCESS", alice.init("alice"));
+
                 Assertions.assertEquals("SUCCESS", bob.init("bob"));
 
-                alice.sendTo("bob", "SGVsbG8=");
-                Assertions.assertEquals("FROM alice SGVsbG8=", bob.readLine());
+                String aliceMessageId = UUID.randomUUID().toString();
 
-                bob.sendTo("alice", "V29ybGQ=");
-                Assertions.assertEquals("FROM bob V29ybGQ=", alice.readLine());
+                alice.sendMessage(CONVERSATION_ID, aliceMessageId, CREATED_AT, "SGVsbG8=");
 
-                String query =
-                        "SELECT sender_id, recipient_id, payload FROM valoq_messages.messages;";
-                long deadline = System.currentTimeMillis() + 3000;
-                int rowCount = 0;
-                while (System.currentTimeMillis() < deadline && rowCount < 2) {
-                    rowCount = getSession().execute(query).all().size();
-                    if (rowCount < 2) Thread.sleep(50);
-                }
-                Assertions.assertEquals(
-                        2, rowCount, "Both messages must be persisted in Cassandra");
+                String bobEvent = bob.readLine();
+
+                Assertions.assertNotNull(bobEvent);
+                Assertions.assertTrue(bobEvent.startsWith("EVENT MESSAGE_CREATED "));
+                Assertions.assertTrue(bobEvent.contains(CONVERSATION_ID));
+                Assertions.assertTrue(bobEvent.contains("alice"));
+                Assertions.assertTrue(bobEvent.endsWith("SGVsbG8="));
+
+                String aliceEvent = alice.readLine();
+
+                Assertions.assertNotNull(aliceEvent);
+                Assertions.assertTrue(aliceEvent.startsWith("EVENT MESSAGE_CREATED "));
+                Assertions.assertTrue(aliceEvent.contains(CONVERSATION_ID));
+                Assertions.assertTrue(aliceEvent.contains("alice"));
+                Assertions.assertTrue(aliceEvent.endsWith("SGVsbG8="));
+
+                String bobMessageId = UUID.randomUUID().toString();
+
+                bob.sendMessage(CONVERSATION_ID, bobMessageId, CREATED_AT, "V29ybGQ=");
+
+                String aliceEvent2 = alice.readLine();
+
+                Assertions.assertNotNull(aliceEvent2);
+                Assertions.assertTrue(aliceEvent2.startsWith("EVENT MESSAGE_CREATED "));
+                Assertions.assertTrue(aliceEvent2.contains(CONVERSATION_ID));
+                Assertions.assertTrue(aliceEvent2.contains("bob"));
+                Assertions.assertTrue(aliceEvent2.endsWith("V29ybGQ="));
+
+                String bobEvent2 = bob.readLine();
+
+                Assertions.assertNotNull(bobEvent2);
+                Assertions.assertTrue(bobEvent2.startsWith("EVENT MESSAGE_CREATED "));
+                Assertions.assertTrue(bobEvent2.contains("bob"));
+                Assertions.assertTrue(bobEvent2.endsWith("V29ybGQ="));
+
+                Row row =
+                        awaitRow(
+                                """
+                                SELECT event_id, event_type, actor_id, payload
+                                FROM valoq_messages.events
+                                WHERE conversation_id = 'conversation-e2e'
+                                  AND time_bucket = '2026-09'
+                                  AND hash_bucket = 0
+                                LIMIT 1
+                                """);
+
+                Assertions.assertNotNull(row, "Message must be persisted in Cassandra");
+
+                Assertions.assertEquals("MESSAGE_CREATED", row.getString("event_type"));
             }
         }
 
         @Test
         @DisplayName(
-                "Sending to an offline recipient persists to Cassandra and returns error to sender")
-        void sendToOfflineRecipientPersistsMessage() throws Exception {
+                "Sending to an offline conversation member persists the event and does not fail")
+        void sendToOfflineMemberPersistsEvent() throws Exception {
+
+            addConversationMembers(CONVERSATION_ID, "alice", "offline_user");
+
             try (MessageTestClient alice = connect()) {
+
                 Assertions.assertEquals("SUCCESS", alice.init("alice"));
 
-                alice.sendTo("offline_user", "SGVsbG8=");
-                Assertions.assertEquals("ERROR Recipient not connected", alice.readLine());
+                alice.sendMessage(
+                        CONVERSATION_ID, UUID.randomUUID().toString(), CREATED_AT, "SGVsbG8=");
+
+                /*
+                 * Sender is online, so it receives its own event.
+                 */
+                String event = alice.readLine();
+
+                Assertions.assertNotNull(event);
+                Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
+                Assertions.assertTrue(event.contains(CONVERSATION_ID));
+                Assertions.assertTrue(event.contains("alice"));
+                Assertions.assertTrue(event.endsWith("SGVsbG8="));
 
                 Row row =
                         awaitRow(
-                                "SELECT sender_id, recipient_id, payload FROM valoq_messages.messages WHERE recipient_id = 'offline_user' ALLOW FILTERING;");
-                Assertions.assertNotNull(
-                        row, "Message to offline recipient must be saved in Cassandra");
-                Assertions.assertEquals("alice", row.getString("sender_id"));
+                                """
+                                SELECT event_id, event_type, actor_id, payload
+                                FROM valoq_messages.events
+                                WHERE conversation_id = 'conversation-e2e'
+                                  AND time_bucket = '2026-09'
+                                  AND hash_bucket = 0
+                                LIMIT 1
+                                """);
+
+                Assertions.assertNotNull(row, "Offline member message must be persisted");
+
+                Assertions.assertEquals("MESSAGE_CREATED", row.getString("event_type"));
+
+                Assertions.assertEquals("alice", row.getString("actor_id"));
+
                 Assertions.assertEquals("SGVsbG8=", row.getString("payload"));
             }
         }
 
         @Test
-        @DisplayName("Messages between 3 distinct users must only route to the intended recipient")
+        @DisplayName("Messages in a conversation are delivered only to its members")
         void multiUserRoutingIsolation() throws Exception {
+
+            addConversationMembers(CONVERSATION_ID, "alice", "bob");
+
+            addConversationMember("conversation-other", "charlie");
+
             try (MessageTestClient alice = connect();
                     MessageTestClient bob = connect();
                     MessageTestClient charlie = connect()) {
@@ -96,23 +173,47 @@ class MessageServerE2ETest extends BaseIntegrationTest {
                 alice.init("alice");
                 bob.init("bob");
                 charlie.init("charlie");
-                alice.sendTo("bob", "SGVsbG8gQm9i");
 
-                Assertions.assertEquals("FROM alice SGVsbG8gQm9i", bob.readLine());
+                alice.sendMessage(
+                        CONVERSATION_ID, UUID.randomUUID().toString(), CREATED_AT, "SGVsbG8gQm9i");
+
+                String bobEvent = bob.readLine();
+
+                Assertions.assertNotNull(bobEvent);
+                Assertions.assertTrue(bobEvent.startsWith("EVENT MESSAGE_CREATED "));
+                Assertions.assertTrue(bobEvent.contains(CONVERSATION_ID));
+                Assertions.assertTrue(bobEvent.contains("alice"));
+                Assertions.assertTrue(bobEvent.endsWith("SGVsbG8gQm9i"));
+
                 Assertions.assertNull(
                         charlie.readLine(Duration.ofMillis(200)),
-                        "Charlie should not receive message meant for Bob");
+                        "Charlie is not a member of the conversation");
             }
         }
 
         @Test
-        @DisplayName("Client sending message to itself should receive it")
+        @DisplayName("Client sending a message to its conversation receives the event")
         void selfMessagingFlow() throws Exception {
-            try (MessageTestClient alice = connect()) {
-                alice.init("alice");
-                alice.sendTo("alice", "U2VsZi1tZXNzYWdl");
 
-                Assertions.assertEquals("FROM alice U2VsZi1tZXNzYWdl", alice.readLine());
+            addConversationMember(CONVERSATION_ID, "alice");
+
+            try (MessageTestClient alice = connect()) {
+
+                alice.init("alice");
+
+                alice.sendMessage(
+                        CONVERSATION_ID,
+                        UUID.randomUUID().toString(),
+                        CREATED_AT,
+                        "U2VsZi1tZXNzYWdl");
+
+                String event = alice.readLine();
+
+                Assertions.assertNotNull(event);
+                Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
+                Assertions.assertTrue(event.contains(CONVERSATION_ID));
+                Assertions.assertTrue(event.contains("alice"));
+                Assertions.assertTrue(event.endsWith("U2VsZi1tZXNzYWdl"));
             }
         }
     }
@@ -123,29 +224,49 @@ class MessageServerE2ETest extends BaseIntegrationTest {
 
         @Test
         @DisplayName(
-                "When recipient disconnects, server must clean up registry and return error on subsequent sends")
-        void disconnectedRecipientBecomesUnreachable() throws Exception {
+                "When a conversation member disconnects, the remaining member still receives events")
+        void disconnectedMemberDoesNotBreakRouting() throws Exception {
+
+            addConversationMembers(CONVERSATION_ID, "alice", "bob");
+
             try (MessageTestClient alice = connect();
                     MessageTestClient bob = connect()) {
 
                 alice.init("alice");
                 bob.init("bob");
+
                 bob.close();
+
                 long deadline = System.currentTimeMillis() + 2000;
+
                 while (System.currentTimeMillis() < deadline
                         && getServer().getConnectionTracker().get("bob") != null) {
+
                     Thread.sleep(20);
                 }
 
-                alice.sendTo("bob", "WW91IHRoZXJlPw==");
-                Assertions.assertEquals("ERROR Recipient not connected", alice.readLine());
+                alice.sendMessage(
+                        CONVERSATION_ID,
+                        UUID.randomUUID().toString(),
+                        CREATED_AT,
+                        "WW91IHRoZXJlPw==");
+
+                String event = alice.readLine();
+
+                Assertions.assertNotNull(event);
+                Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
+                Assertions.assertTrue(event.contains("alice"));
+                Assertions.assertTrue(event.endsWith("WW91IHRoZXJlPw=="));
             }
         }
 
         @Test
         @DisplayName(
-                "Logging in with the same userId from a new connection overrides the old getSession()")
+                "Logging in with the same userId from a new connection overrides the old connection")
         void duplicateUserUsesLatestConnection() throws Exception {
+
+            addConversationMembers(CONVERSATION_ID, "alice", "bob");
+
             try (MessageTestClient firstAlice = connect();
                     MessageTestClient secondAlice = connect();
                     MessageTestClient bob = connect()) {
@@ -153,9 +274,17 @@ class MessageServerE2ETest extends BaseIntegrationTest {
                 firstAlice.init("alice");
                 bob.init("bob");
                 secondAlice.init("alice");
-                bob.sendTo("alice", "SGVsbG8=");
 
-                Assertions.assertEquals("FROM bob SGVsbG8=", secondAlice.readLine());
+                bob.sendMessage(
+                        CONVERSATION_ID, UUID.randomUUID().toString(), CREATED_AT, "SGVsbG8=");
+
+                String event = secondAlice.readLine();
+
+                Assertions.assertNotNull(event);
+                Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
+                Assertions.assertTrue(event.contains("bob"));
+                Assertions.assertTrue(event.endsWith("SGVsbG8="));
+
                 Assertions.assertNull(
                         firstAlice.readLine(Duration.ofMillis(200)),
                         "Old connection should not receive the message");
@@ -170,38 +299,63 @@ class MessageServerE2ETest extends BaseIntegrationTest {
         @Test
         @DisplayName("Invalid INIT closes socket immediately")
         void invalidInitClosesSocket() throws Exception {
+
             try (MessageTestClient client = connect()) {
+
                 client.send("init bad_format");
 
                 Assertions.assertEquals("INVALID", client.readLine());
+
                 Assertions.assertTrue(client.isClosedByServer());
             }
         }
 
         @Test
-        @DisplayName(
-                "Malformed SEND returns ERROR format and keeps connection open for subsequent messages")
+        @DisplayName("Malformed SEND returns ERROR format and keeps connection open")
         void malformedSendReturnsErrorAndKeepsConnectionAlive() throws Exception {
+
+            addConversationMembers(CONVERSATION_ID, "alice", "bob");
+
             try (MessageTestClient alice = connect();
                     MessageTestClient bob = connect()) {
 
                 alice.init("alice");
                 bob.init("bob");
+
                 alice.send("SEND bob");
+
                 Assertions.assertEquals("ERROR Invalid SEND format", alice.readLine());
-                alice.sendTo("bob", "U3RpbGwgYWxpdmU=");
-                Assertions.assertEquals("FROM alice U3RpbGwgYWxpdmU=", bob.readLine());
+
+                alice.sendMessage(
+                        CONVERSATION_ID,
+                        UUID.randomUUID().toString(),
+                        CREATED_AT,
+                        "U3RpbGwgYWxpdmU=");
+
+                String event = bob.readLine();
+
+                Assertions.assertNotNull(event);
+                Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
+                Assertions.assertTrue(event.contains("alice"));
+                Assertions.assertTrue(event.endsWith("U3RpbGwgYWxpdmU="));
             }
         }
 
         @Test
-        @DisplayName("Recipient ID exceeding 64 characters should be rejected")
-        void recipientIdExceedingMaxCapacityRejected() throws Exception {
+        @DisplayName("Conversation ID exceeding 128 characters should be rejected")
+        void conversationIdExceedingMaxCapacityRejected() throws Exception {
+
             try (MessageTestClient alice = connect()) {
+
                 alice.init("alice");
 
-                String oversizedRecipient = "a".repeat(65);
-                alice.sendTo(oversizedRecipient, "cGF5bG9hZA==");
+                String oversizedConversationId = "a".repeat(129);
+
+                alice.sendMessage(
+                        oversizedConversationId,
+                        UUID.randomUUID().toString(),
+                        CREATED_AT,
+                        "cGF5bG9hZA==");
 
                 Assertions.assertEquals("ERROR Invalid SEND format", alice.readLine());
             }
@@ -213,8 +367,11 @@ class MessageServerE2ETest extends BaseIntegrationTest {
     class TcpFramingTests {
 
         @Test
-        @DisplayName("Rapid burst of messages must arrive in sequential chronological order")
+        @DisplayName("Rapid burst of messages must arrive in event order")
         void rapidBurstMessageOrdering() throws Exception {
+
+            addConversationMembers(CONVERSATION_ID, "alice", "bob");
+
             try (MessageTestClient alice = connect();
                     MessageTestClient bob = connect()) {
 
@@ -222,29 +379,68 @@ class MessageServerE2ETest extends BaseIntegrationTest {
                 bob.init("bob");
 
                 int burstCount = 5;
+
                 for (int i = 0; i < burstCount; i++) {
-                    alice.sendTo("bob", "msg_" + i);
+
+                    alice.sendMessage(
+                            CONVERSATION_ID, UUID.randomUUID().toString(), CREATED_AT, "bXNnX" + i);
                 }
 
                 for (int i = 0; i < burstCount; i++) {
-                    Assertions.assertEquals("FROM alice msg_" + i, bob.readLine());
+
+                    String event = bob.readLine();
+
+                    Assertions.assertNotNull(event);
+
+                    Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
+
+                    Assertions.assertTrue(event.contains(CONVERSATION_ID));
+
+                    Assertions.assertTrue(event.endsWith("bXNnX" + i));
                 }
             }
         }
 
         @Test
-        @DisplayName(
-                "Pipelined TCP write (multiple frames in one packet) must be processed independently")
+        @DisplayName("Pipelined TCP writes must be processed independently")
         void pipelinedCommandsInSinglePacket() throws Exception {
+
+            addConversationMembers(CONVERSATION_ID, "alice", "bob");
+
             try (MessageTestClient alice = connect();
                     MessageTestClient bob = connect()) {
 
                 bob.init("bob");
+
                 String aliceToken = alice.createToken("alice");
-                alice.send("INIT " + aliceToken + "\nSEND bob UGlwZWxpbmVk\n");
+
+                String clientMessageId = UUID.randomUUID().toString();
+
+                String pipelined =
+                        "INIT "
+                                + aliceToken
+                                + "\n"
+                                + "SEND "
+                                + CONVERSATION_ID
+                                + " "
+                                + clientMessageId
+                                + " "
+                                + CREATED_AT
+                                + " "
+                                + "UGlwcGVsaW5lZA=="
+                                + "\n";
+
+                alice.send(pipelined);
 
                 Assertions.assertEquals("SUCCESS", alice.readLine());
-                Assertions.assertEquals("FROM alice UGlwZWxpbmVk", bob.readLine());
+
+                String event = bob.readLine();
+
+                Assertions.assertNotNull(event);
+                Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
+                Assertions.assertTrue(event.contains(CONVERSATION_ID));
+                Assertions.assertTrue(event.contains("alice"));
+                Assertions.assertTrue(event.endsWith("UGlwcGVsaW5lZA=="));
             }
         }
     }

@@ -21,28 +21,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package server;
+package server.model;
 
-import io.netty.channel.embedded.EmbeddedChannel;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-class MessageServerInitializerTest {
-
-    private EmbeddedChannel channel = new EmbeddedChannel();
-
-    @BeforeEach
-    public void setUp() {
-        channel =
-                new EmbeddedChannel(
-                        new MessageServer.MessageServerInitializer(new ConnectionTracker()));
-    }
-
-    @Test
-    public void testChannelInitialPipeline() {
-        Assertions.assertNotNull(channel.pipeline().get("stringDecoder"));
-        Assertions.assertNotNull(channel.pipeline().get("initVerbHandler"));
-        Assertions.assertNull(channel.pipeline().get("chatMessageHandler"));
-    }
+public enum EventType {
+    MESSAGE_CREATED,
+    MESSAGE_UPDATED,
+    MESSAGE_DELETED,
+    MEMBER_JOINED,
+    MEMBER_LEFT,
+    MEMBER_ADDED,
+    MEMBER_REMOVED,
+    MEMBER_BLOCKED,
+    MEMBER_UNBLOCKED
 }

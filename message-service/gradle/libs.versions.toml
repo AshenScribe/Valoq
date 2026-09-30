@@ -3,6 +3,7 @@ cassandra-driver = "4.19.3"
 groovy = "3.0.5"
 jackson-databind = "2.22.2"
 junit = "5.7.1"
+mockito = "5.24.0"
 netty = "4.2.18.Final"
 slf4j = "2.0.19"
 owner = "1.0.12"
@@ -19,6 +20,7 @@ junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.re
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 netty-bom = { module = "io.netty:netty-bom", version.ref = "netty" }
 netty-buffer = { module = "io.netty:netty-buffer" }
 netty-handler = { module = "io.netty:netty-handler" }

@@ -24,6 +24,8 @@
 package server.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import database.ConversationMemberRepository;
+import database.EventRepository;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -43,7 +45,12 @@ public class InitVerbHandler extends SimpleChannelInboundHandler<String> {
     private final MessageRouter messageRouter;
 
     public InitVerbHandler(ConnectionTracker connectionTracker) {
-        this(connectionTracker, new MessageRouter(connectionTracker));
+        this(
+                connectionTracker,
+                new MessageRouter(
+                        connectionTracker,
+                        new EventRepository(),
+                        new ConversationMemberRepository()));
     }
 
     public InitVerbHandler(ConnectionTracker connectionTracker, MessageRouter messageRouter) {

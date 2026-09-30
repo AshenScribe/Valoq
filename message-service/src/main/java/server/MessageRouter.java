@@ -23,34 +23,66 @@
  */
 package server;
 
-import database.MessageRepository;
+import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
+import com.datastax.oss.driver.api.core.uuid.Uuids;
+import database.BucketUtils;
+import database.ConversationMemberRepository;
+import database.EventRepository;
 import io.netty.channel.Channel;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletionStage;
+import server.model.Event;
 
 public class MessageRouter {
 
     private final ConnectionTracker connectionTracker;
-    private final MessageRepository messageRepository;
+    private final EventRepository eventRepository;
+    private final ConversationMemberRepository memberRepository;
 
-    public MessageRouter(ConnectionTracker connectionTracker) {
-        this(connectionTracker, null);
-    }
+    public MessageRouter(
+            ConnectionTracker connectionTracker,
+            EventRepository eventRepository,
+            ConversationMemberRepository memberRepository) {
 
-    public MessageRouter(ConnectionTracker connectionTracker, MessageRepository messageRepository) {
         this.connectionTracker = connectionTracker;
-        this.messageRepository = messageRepository;
+        this.eventRepository = eventRepository;
+        this.memberRepository = memberRepository;
     }
 
-    public boolean route(String senderId, String recipientId, String payload) {
-        if (messageRepository != null) {
-            messageRepository.saveMessageAsync(senderId, recipientId, payload);
-        }
+    public CompletionStage<AsyncResultSet> route(Event event) {
+        UUID eventId = Uuids.timeBased();
+        String timeBucket = BucketUtils.toTimeBucket(event.createdAt());
+        List<String> members = memberRepository.findMemberIds(event.conversationId());
 
-        Channel recipientChannel = connectionTracker.get(recipientId);
-        if (recipientChannel == null) {
-            return false;
-        }
+        return eventRepository
+                .saveEvent(
+                        event.conversationId(),
+                        timeBucket,
+                        0,
+                        eventId,
+                        event.eventType().name(),
+                        event.senderId(),
+                        event.clientMessageId(),
+                        event.payload())
+                .thenApply(
+                        result -> {
+                            for (String memberId : members) {
+                                Channel channel = connectionTracker.get(memberId);
+                                if (channel == null) {
+                                    continue;
+                                }
+                                channel.writeAndFlush(
+                                        String.format(
+                                                "EVENT %s %s %s %s %s",
+                                                event.eventType().name(),
+                                                eventId,
+                                                event.conversationId(),
+                                                event.senderId(),
+                                                event.payload()));
+                            }
 
-        recipientChannel.writeAndFlush(String.format("FROM %s %s", senderId, payload));
-        return true;
+                            return result;
+                        });
     }
 }

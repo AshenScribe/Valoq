@@ -25,6 +25,8 @@ package server;
 
 import config.ServerConfig;
 import database.CassandraManager;
+import database.ConversationMemberRepository;
+import database.EventRepository;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -111,9 +113,8 @@ public class MessageServer {
                     connectionTracker,
                     new MessageRouter(
                             connectionTracker,
-                            CassandraManager.isInitialized()
-                                    ? new database.MessageRepository()
-                                    : null));
+                            CassandraManager.isInitialized() ? new EventRepository() : null,
+                            new ConversationMemberRepository()));
         }
 
         public MessageServerInitializer(
