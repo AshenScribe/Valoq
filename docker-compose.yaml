@@ -91,7 +91,7 @@ services:
 
         exec docker-entrypoint.sh cassandra -f
     healthcheck:
-      test: ["CMD-SHELL", "cqlsh -u cassandra -p cassandra --ssl -e 'DESCRIBE KEYSPACE valoq_keyspace' || exit 1"]
+      test: ["CMD-SHELL", "cqlsh -u cassandra -p cassandra --ssl -e 'DESCRIBE KEYSPACE system.local' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 15

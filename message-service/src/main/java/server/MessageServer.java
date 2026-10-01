@@ -44,12 +44,14 @@ import io.netty.handler.codec.string.LineSeparator;
 import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AttributeKey;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import server.handler.ConnectionLifecycleHandler;
+import server.handler.IdleConnectionReaperHandler;
 import server.handler.InitVerbHandler;
 import server.handler.SyncHandler;
 
@@ -137,7 +139,8 @@ public class MessageServer {
         protected void initChannel(Channel ch) {
             ch.attr(SESSION_KEY).set(new Session());
             connectionTracker.track(ch);
-
+            ch.pipeline().addLast("idleStateHandler", new IdleStateHandler(300, 0, 0, TimeUnit.SECONDS));
+            ch.pipeline().addLast("idleReaperHandler", IdleConnectionReaperHandler.INSTANCE);
             ch.pipeline()
                     .addLast(
                             "lineEncoder",
