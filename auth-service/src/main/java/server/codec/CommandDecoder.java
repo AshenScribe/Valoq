@@ -30,53 +30,107 @@ import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.MessageToMessageDecoder;
 import java.util.Base64;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import server.command.AuthCommand;
 import server.command.BasicCommand;
 import server.command.RegisterCommand;
 import server.command.TokenCommand;
 
-/**
- * AUTH TOKEN/BASIC/REGISTER DATA DATA will be base64 encoded string of username:password for BASIC
- * and for REGISTER, it will be base64 encoded JSON
- */
 public class CommandDecoder extends MessageToMessageDecoder<String> {
 
-    final Pattern AUTH_PATTERN = Pattern.compile("AUTH\\s(\\S+)\\s(\\S+)$");
     private static final ObjectMapper OBJECT_MAPPER =
             new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @Override
     protected void decode(ChannelHandlerContext ctx, String msg, List<Object> out) {
-        final Matcher matcher = AUTH_PATTERN.matcher(msg);
-        if (!matcher.matches())
+        String trimmed = msg.trim();
+        if (trimmed.isEmpty()) {
+            return;
+        }
+
+        if (!trimmed.startsWith("AUTH ") && !trimmed.startsWith("auth ")) {
             throw new DecoderException(
-                    String.format(
-                            "invalid command format: %s\nExpected AUTH TOKEN/BASIC/REGISTER DATA custom_payload",
-                            msg));
+                    "Invalid command format. Expected: AUTH <TOKEN|BASIC|REGISTER> <PAYLOAD>");
+        }
+
+        int firstSpace = trimmed.indexOf(' ');
+        int secondSpace = trimmed.indexOf(' ', firstSpace + 1);
+
+        while (secondSpace != -1 && secondSpace == firstSpace + 1) {
+            firstSpace = secondSpace;
+            secondSpace = trimmed.indexOf(' ', firstSpace + 1);
+        }
+
+        if (secondSpace == -1) {
+            throw new DecoderException(
+                    "Invalid command format. Expected: AUTH <TOKEN|BASIC|REGISTER> <PAYLOAD>");
+        }
+
+        String commandType = trimmed.substring(firstSpace + 1, secondSpace).trim().toUpperCase();
+        String payload = trimmed.substring(secondSpace + 1).trim();
+
+        if (payload.isEmpty()) {
+            throw new DecoderException(
+                    "Invalid command format. Expected: AUTH <TOKEN|BASIC|REGISTER> <PAYLOAD>");
+        }
+
         AuthCommand authCommand =
-                switch (matcher.group(1)) {
-                    case "TOKEN" -> new TokenCommand(matcher.group(2));
-                    case "BASIC" -> {
-                        String[] parts = matcher.group(2).split(":");
-                        yield new BasicCommand(parts[0], parts[1], parts[2]);
-                    }
-                    case "REGISTER" -> {
-                        try {
-                            byte[] jsonBytes = Base64.getDecoder().decode(matcher.group(2));
-                            yield OBJECT_MAPPER.readValue(jsonBytes, RegisterCommand.class);
-                        } catch (Exception e) {
-                            throw new DecoderException(
-                                    "Invalid JSON payload for REGISTER command", e);
-                        }
-                    }
+                switch (commandType) {
+                    case "TOKEN" -> decodeToken(payload);
+                    case "BASIC" -> decodeBasic(payload);
+                    case "REGISTER" -> decodeRegister(payload);
                     default ->
-                            throw new IllegalStateException(
-                                    String.format(
-                                            "invalid command type: %s\nExpected TOKEN/BASIC/REGISTER",
-                                            matcher.group(1)));
+                            throw new DecoderException(
+                                    "Unsupported command type: "
+                                            + commandType
+                                            + ". Expected: TOKEN, BASIC, or REGISTER");
                 };
+
         out.add(authCommand);
+    }
+
+    private TokenCommand decodeToken(String payload) {
+        if (payload.isBlank()) {
+            throw new DecoderException("AUTH TOKEN requires a non-empty token payload");
+        }
+        return new TokenCommand(payload);
+    }
+
+    private BasicCommand decodeBasic(String payload) {
+        int firstColon = payload.indexOf(':');
+        if (firstColon == -1) {
+            throw new DecoderException(
+                    "Invalid BASIC payload. Expected format: username:password:salt");
+        }
+        int secondColon = payload.indexOf(':', firstColon + 1);
+        if (secondColon == -1) {
+            throw new DecoderException(
+                    "Invalid BASIC payload. Expected format: username:password:salt");
+        }
+
+        String username = payload.substring(0, firstColon);
+        String password = payload.substring(firstColon + 1, secondColon);
+        String salt = payload.substring(secondColon + 1);
+
+        return new BasicCommand(username, password, salt);
+    }
+
+    private RegisterCommand decodeRegister(String payload) {
+        byte[] jsonBytes;
+        try {
+            jsonBytes = Base64.getDecoder().decode(payload);
+        } catch (IllegalArgumentException e) {
+            throw new DecoderException("Invalid Base64 payload for REGISTER command", e);
+        }
+
+        try {
+            RegisterCommand cmd = OBJECT_MAPPER.readValue(jsonBytes, RegisterCommand.class);
+            if (cmd.username() == null || cmd.password() == null) {
+                throw new DecoderException(
+                        "REGISTER payload missing mandatory fields (username/password)");
+            }
+            return cmd;
+        } catch (Exception e) {
+            throw new DecoderException("Invalid JSON payload for REGISTER command", e);
+        }
     }
 }

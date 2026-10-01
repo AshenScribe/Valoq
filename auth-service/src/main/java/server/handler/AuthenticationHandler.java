@@ -23,41 +23,52 @@
  */
 package server.handler;
 
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import server.command.AuthCommand;
 
+@ChannelHandler.Sharable
 public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthCommand> {
 
     private static final ExecutorService AUTH_WORKERS = Executors.newVirtualThreadPerTaskExecutor();
+    private static final Semaphore DB_CONCURRENCY_GATE = new Semaphore(20);
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, AuthCommand msg) {
         CompletableFuture.supplyAsync(
-                        () -> AuthenticationHandlerFactory.getAuthenticationHandler(msg).login(msg),
+                        () -> {
+                            try {
+                                DB_CONCURRENCY_GATE.acquire();
+                                try {
+                                    return AuthenticationHandlerFactory.getAuthenticationHandler(
+                                                    msg)
+                                            .login(msg);
+                                } finally {
+                                    DB_CONCURRENCY_GATE.release();
+                                }
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                throw new RuntimeException("Authentication interrupted", e);
+                            }
+                        },
                         AUTH_WORKERS)
-                .thenAccept(
-                        token -> {
+                .whenComplete(
+                        (token, ex) -> {
                             ctx.channel()
                                     .eventLoop()
                                     .execute(
                                             () -> {
-                                                ctx.writeAndFlush(token);
+                                                if (ex != null) {
+                                                    ctx.fireExceptionCaught(ex);
+                                                } else {
+                                                    ctx.writeAndFlush(token);
+                                                }
                                             });
-                        })
-                .exceptionally(
-                        ex -> {
-                            ctx.channel()
-                                    .eventLoop()
-                                    .execute(
-                                            () -> {
-                                                ctx.writeAndFlush(
-                                                        "ERROR " + ex.getCause().getMessage());
-                                            });
-                            return null;
                         });
     }
 }

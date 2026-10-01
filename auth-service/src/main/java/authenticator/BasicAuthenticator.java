@@ -26,6 +26,8 @@ package authenticator;
 import authenticator.jwt.JwtUtil;
 import database.UserRepository;
 import exception.UserNotFoundException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Map;
 import server.command.AuthCommand;
 import server.command.BasicCommand;
@@ -48,12 +50,18 @@ public class BasicAuthenticator implements Authenticator {
     public String login(AuthCommand authCommand) {
         BasicCommand basicCommand = (BasicCommand) authCommand;
         User user = UserMapper.mapToUser(userRepository.getUser(basicCommand.username()));
-        if (user == null)
+        if (user == null) {
             throw new UserNotFoundException(
                     String.format("User with username %s not found", basicCommand.username()));
-        if (user.passwordHash().equals(basicCommand.password())) {
+        }
+
+        byte[] expectedHashBytes = user.passwordHash().getBytes(StandardCharsets.UTF_8);
+        byte[] actualHashBytes = basicCommand.password().getBytes(StandardCharsets.UTF_8);
+
+        if (MessageDigest.isEqual(expectedHashBytes, actualHashBytes)) {
             return JwtUtil.getInstance().generateJwt(user.userId(), Map.of());
         }
+
         throw new UserNotFoundException(
                 String.format(
                         "User with username %s not found or password does not match",

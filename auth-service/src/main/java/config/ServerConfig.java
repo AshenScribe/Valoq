@@ -69,7 +69,25 @@ public class ServerConfig {
     public static class ServerProps {
         private String host = "localhost";
         private int port = 8001;
+        private int maxFrameLength = 8192;
         private ServerSslProps ssl = new ServerSslProps();
+        private int idleTimeoutSeconds = 60; // 0 disables idle timeout
+
+        public int getIdleTimeoutSeconds() {
+            return idleTimeoutSeconds;
+        }
+
+        public void setIdleTimeoutSeconds(int idleTimeoutSeconds) {
+            this.idleTimeoutSeconds = idleTimeoutSeconds;
+        }
+
+        public int getMaxFrameLength() {
+            return maxFrameLength;
+        }
+
+        public void setMaxFrameLength(int maxFrameLength) {
+            this.maxFrameLength = maxFrameLength;
+        }
 
         public String host() {
             return host;

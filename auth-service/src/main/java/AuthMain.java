@@ -27,15 +27,16 @@ import config.ServerConfig;
 import database.DatabaseManager;
 import server.AuthServer;
 
-public final class Main {
+public final class AuthMain {
 
-    private Main() {}
+    private AuthMain() {}
 
-    public static void main() throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException {
         ServerConfig appConfig = new ConfigLoader().appConfig();
         DatabaseManager.init(appConfig);
         JwtUtil.getInstance(appConfig.jwt().expirationSeconds());
         AuthServer server = new AuthServer(appConfig);
+
         Runtime.getRuntime()
                 .addShutdownHook(
                         new Thread(
@@ -43,6 +44,7 @@ public final class Main {
                                     server.stop();
                                     DatabaseManager.close();
                                 }));
+
         server.start();
     }
 }

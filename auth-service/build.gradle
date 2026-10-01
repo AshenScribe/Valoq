@@ -54,7 +54,7 @@ dependencies {
 }
 
 application {
-    mainClass = "Main"
+    mainClass = "AuthMain"
     applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
 }
 
