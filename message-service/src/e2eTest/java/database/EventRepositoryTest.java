@@ -55,10 +55,13 @@ class EventRepositoryTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should successfully insert a generic event")
         void saveEventSuccessfullyPersistsEvent() throws Exception {
-            String conversationId = "alice:bob";
+
+            UUID conversationId = UUID.randomUUID();
             String timeBucket = "2026-09";
             int hashBucket = 0;
             UUID eventId = Uuids.timeBased();
+            UUID actorId = UUID.randomUUID();
+            UUID entityId = UUID.randomUUID();
 
             AsyncResultSet result =
                     eventRepository
@@ -68,8 +71,8 @@ class EventRepositoryTest extends BaseIntegrationTest {
                                     hashBucket,
                                     eventId,
                                     "MESSAGE_CREATED",
-                                    "usr_alice",
-                                    eventId.toString(),
+                                    actorId,
+                                    entityId,
                                     "SGVsbG8gQm9iIQ==")
                             .toCompletableFuture()
                             .get(5, TimeUnit.SECONDS);
@@ -78,19 +81,19 @@ class EventRepositoryTest extends BaseIntegrationTest {
 
             String cql =
                     """
-                            SELECT conversation_id,
-                                   time_bucket,
-                                   hash_bucket,
-                                   event_id,
-                                   event_type,
-                                   actor_id,
-                                   entity_id,
-                                   payload
-                            FROM valoq_messages.events
-                            WHERE conversation_id = ?
-                              AND time_bucket = ?
-                              AND hash_bucket = ?
-                            """;
+                    SELECT conversation_id,
+                           time_bucket,
+                           hash_bucket,
+                           event_id,
+                           event_type,
+                           actor_id,
+                           entity_id,
+                           payload
+                    FROM valoq_messages.events
+                    WHERE conversation_id = ?
+                      AND time_bucket = ?
+                      AND hash_bucket = ?
+                    """;
 
             ResultSet rs =
                     getSession()
@@ -103,7 +106,7 @@ class EventRepositoryTest extends BaseIntegrationTest {
 
             Assertions.assertNotNull(row, "Event must be found in Cassandra");
 
-            Assertions.assertEquals(conversationId, row.getString("conversation_id"));
+            Assertions.assertEquals(conversationId, row.getUuid("conversation_id"));
 
             Assertions.assertEquals(timeBucket, row.getString("time_bucket"));
 
@@ -113,9 +116,9 @@ class EventRepositoryTest extends BaseIntegrationTest {
 
             Assertions.assertEquals("MESSAGE_CREATED", row.getString("event_type"));
 
-            Assertions.assertEquals("usr_alice", row.getString("actor_id"));
+            Assertions.assertEquals(actorId, row.getUuid("actor_id"));
 
-            Assertions.assertEquals(eventId.toString(), row.getString("entity_id"));
+            Assertions.assertEquals(entityId, row.getUuid("entity_id"));
 
             Assertions.assertEquals("SGVsbG8gQm9iIQ==", row.getString("payload"));
         }
@@ -123,17 +126,22 @@ class EventRepositoryTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should preserve large event payloads without truncation")
         void saveEventLargePayloadStoredAccurately() throws Exception {
+
+            UUID conversationId = UUID.randomUUID();
+            UUID actorId = UUID.randomUUID();
+            UUID entityId = UUID.randomUUID();
+
             String largePayload = "A".repeat(64 * 1024);
 
             eventRepository
                     .saveEvent(
-                            "alice:bob",
+                            conversationId,
                             "2026-09",
                             0,
                             Uuids.timeBased(),
                             "MESSAGE_CREATED",
-                            "alice",
-                            UUID.randomUUID().toString(),
+                            actorId,
+                            entityId,
                             largePayload)
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
@@ -144,13 +152,13 @@ class EventRepositoryTest extends BaseIntegrationTest {
                                     getSession()
                                             .prepare(
                                                     """
-                                                            SELECT payload
-                                                            FROM valoq_messages.events
-                                                            WHERE conversation_id = ?
-                                                              AND time_bucket = ?
-                                                              AND hash_bucket = ?
-                                                            """)
-                                            .bind("alice:bob", "2026-09", 0));
+                                                    SELECT payload
+                                                    FROM valoq_messages.events
+                                                    WHERE conversation_id = ?
+                                                      AND time_bucket = ?
+                                                      AND hash_bucket = ?
+                                                    """)
+                                            .bind(conversationId, "2026-09", 0));
 
             Row row = rs.one();
 
@@ -168,17 +176,21 @@ class EventRepositoryTest extends BaseIntegrationTest {
                 "Events belonging to the same conversation and bucket must share the partition")
         void eventsShareSamePartition() throws Exception {
 
+            UUID conversationId = UUID.randomUUID();
+
             UUID event1 = Uuids.timeBased();
+            UUID actor1 = UUID.randomUUID();
+            UUID entity1 = UUID.randomUUID();
 
             eventRepository
                     .saveEvent(
-                            "alice:bob",
+                            conversationId,
                             "2026-09",
                             0,
                             event1,
                             "MESSAGE_CREATED",
-                            "alice",
-                            event1.toString(),
+                            actor1,
+                            entity1,
                             "msg_1")
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
@@ -186,16 +198,18 @@ class EventRepositoryTest extends BaseIntegrationTest {
             Thread.sleep(10);
 
             UUID event2 = Uuids.timeBased();
+            UUID actor2 = UUID.randomUUID();
+            UUID entity2 = UUID.randomUUID();
 
             eventRepository
                     .saveEvent(
-                            "alice:bob",
+                            conversationId,
                             "2026-09",
                             0,
                             event2,
                             "MESSAGE_CREATED",
-                            "bob",
-                            event2.toString(),
+                            actor2,
+                            entity2,
                             "msg_2")
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
@@ -206,28 +220,30 @@ class EventRepositoryTest extends BaseIntegrationTest {
                                     getSession()
                                             .prepare(
                                                     """
-                                                            SELECT event_id,
-                                                                   event_type,
-                                                                   actor_id,
-                                                                   entity_id,
-                                                                   payload
-                                                            FROM valoq_messages.events
-                                                            WHERE conversation_id = ?
-                                                              AND time_bucket = ?
-                                                              AND hash_bucket = ?
-                                                            """)
-                                            .bind("alice:bob", "2026-09", 0));
+                                                    SELECT event_id,
+                                                           event_type,
+                                                           actor_id,
+                                                           entity_id,
+                                                           payload
+                                                    FROM valoq_messages.events
+                                                    WHERE conversation_id = ?
+                                                      AND time_bucket = ?
+                                                      AND hash_bucket = ?
+                                                    """)
+                                            .bind(conversationId, "2026-09", 0));
 
             List<Row> rows = rs.all();
+            rows.sort(
+                    (left, right) -> left.getUuid("event_id").compareTo(right.getUuid("event_id")));
 
             Assertions.assertEquals(
                     2, rows.size(), "Both events must exist in the shared partition");
 
-            Assertions.assertEquals("alice", rows.get(0).getString("actor_id"));
+            Assertions.assertEquals(actor1, rows.get(0).getUuid("actor_id"));
 
             Assertions.assertEquals("msg_1", rows.get(0).getString("payload"));
 
-            Assertions.assertEquals("bob", rows.get(1).getString("actor_id"));
+            Assertions.assertEquals(actor2, rows.get(1).getUuid("actor_id"));
 
             Assertions.assertEquals("msg_2", rows.get(1).getString("payload"));
         }
@@ -236,97 +252,96 @@ class EventRepositoryTest extends BaseIntegrationTest {
         @DisplayName("Different conversations must be stored in completely isolated partitions")
         void distinctConversationsAreIsolated() throws Exception {
 
+            UUID conversationA = UUID.randomUUID();
+            UUID conversationB = UUID.randomUUID();
+
             eventRepository
                     .saveEvent(
-                            "alice:bob",
+                            conversationA,
                             "2026-09",
                             0,
                             Uuids.timeBased(),
                             "MESSAGE_CREATED",
-                            "alice",
-                            UUID.randomUUID().toString(),
-                            "for_bob")
+                            UUID.randomUUID(),
+                            UUID.randomUUID(),
+                            "for_a")
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
 
             eventRepository
                     .saveEvent(
-                            "alice:charlie",
+                            conversationB,
                             "2026-09",
                             0,
                             Uuids.timeBased(),
                             "MESSAGE_CREATED",
-                            "alice",
-                            UUID.randomUUID().toString(),
-                            "for_charlie")
+                            UUID.randomUUID(),
+                            UUID.randomUUID(),
+                            "for_b")
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
 
-            ResultSet rsBob =
+            ResultSet rowsA =
                     getSession()
                             .execute(
                                     getSession()
                                             .prepare(
                                                     """
-                                                            SELECT payload
-                                                            FROM valoq_messages.events
-                                                            WHERE conversation_id = ?
-                                                              AND time_bucket = ?
-                                                              AND hash_bucket = ?
-                                                            """)
-                                            .bind("alice:bob", "2026-09", 0));
+                                                    SELECT payload
+                                                    FROM valoq_messages.events
+                                                    WHERE conversation_id = ?
+                                                      AND time_bucket = ?
+                                                      AND hash_bucket = ?
+                                                    """)
+                                            .bind(conversationA, "2026-09", 0));
 
-            List<Row> bobRows = rsBob.all();
-
-            Assertions.assertEquals(1, bobRows.size());
-            Assertions.assertEquals("for_bob", bobRows.get(0).getString("payload"));
-
-            ResultSet rsCharlie =
+            ResultSet rowsB =
                     getSession()
                             .execute(
                                     getSession()
                                             .prepare(
                                                     """
-                                                            SELECT payload
-                                                            FROM valoq_messages.events
-                                                            WHERE conversation_id = ?
-                                                              AND time_bucket = ?
-                                                              AND hash_bucket = ?
-                                                            """)
-                                            .bind("alice:charlie", "2026-09", 0));
+                                                    SELECT payload
+                                                    FROM valoq_messages.events
+                                                    WHERE conversation_id = ?
+                                                      AND time_bucket = ?
+                                                      AND hash_bucket = ?
+                                                    """)
+                                            .bind(conversationB, "2026-09", 0));
 
-            List<Row> charlieRows = rsCharlie.all();
+            Assertions.assertEquals("for_a", rowsA.one().getString("payload"));
 
-            Assertions.assertEquals(1, charlieRows.size());
-            Assertions.assertEquals("for_charlie", charlieRows.get(0).getString("payload"));
+            Assertions.assertEquals("for_b", rowsB.one().getString("payload"));
         }
 
         @Test
         @DisplayName("Different time buckets must be stored in different Cassandra partitions")
         void differentTimeBucketsAreIsolated() throws Exception {
 
+            UUID conversationId = UUID.randomUUID();
+
             eventRepository
                     .saveEvent(
-                            "alice:bob",
+                            conversationId,
                             "2026-08",
                             0,
                             Uuids.timeBased(),
                             "MESSAGE_CREATED",
-                            "alice",
-                            UUID.randomUUID().toString(),
+                            UUID.randomUUID(),
+                            UUID.randomUUID(),
                             "august")
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
 
             eventRepository
                     .saveEvent(
-                            "alice:bob",
+                            conversationId,
                             "2026-09",
                             0,
                             Uuids.timeBased(),
                             "MESSAGE_CREATED",
-                            "alice",
-                            UUID.randomUUID().toString(),
+                            UUID.randomUUID(),
+                            UUID.randomUUID(),
                             "september")
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
@@ -337,13 +352,13 @@ class EventRepositoryTest extends BaseIntegrationTest {
                                     getSession()
                                             .prepare(
                                                     """
-                                                            SELECT payload
-                                                            FROM valoq_messages.events
-                                                            WHERE conversation_id = ?
-                                                              AND time_bucket = ?
-                                                              AND hash_bucket = ?
-                                                            """)
-                                            .bind("alice:bob", "2026-08", 0));
+                                                    SELECT payload
+                                                    FROM valoq_messages.events
+                                                    WHERE conversation_id = ?
+                                                      AND time_bucket = ?
+                                                      AND hash_bucket = ?
+                                                    """)
+                                            .bind(conversationId, "2026-08", 0));
 
             ResultSet september =
                     getSession()
@@ -351,13 +366,13 @@ class EventRepositoryTest extends BaseIntegrationTest {
                                     getSession()
                                             .prepare(
                                                     """
-                                                            SELECT payload
-                                                            FROM valoq_messages.events
-                                                            WHERE conversation_id = ?
-                                                              AND time_bucket = ?
-                                                              AND hash_bucket = ?
-                                                            """)
-                                            .bind("alice:bob", "2026-09", 0));
+                                                    SELECT payload
+                                                    FROM valoq_messages.events
+                                                    WHERE conversation_id = ?
+                                                      AND time_bucket = ?
+                                                      AND hash_bucket = ?
+                                                    """)
+                                            .bind(conversationId, "2026-09", 0));
 
             Assertions.assertEquals("august", august.one().getString("payload"));
 
@@ -368,28 +383,30 @@ class EventRepositoryTest extends BaseIntegrationTest {
         @DisplayName("Different hash buckets must be stored in different partitions")
         void differentHashBucketsAreIsolated() throws Exception {
 
+            UUID conversationId = UUID.randomUUID();
+
             eventRepository
                     .saveEvent(
-                            "group-1",
+                            conversationId,
                             "2026-09",
                             0,
                             Uuids.timeBased(),
                             "MESSAGE_CREATED",
-                            "alice",
-                            UUID.randomUUID().toString(),
+                            UUID.randomUUID(),
+                            UUID.randomUUID(),
                             "bucket_0")
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
 
             eventRepository
                     .saveEvent(
-                            "group-1",
+                            conversationId,
                             "2026-09",
                             1,
                             Uuids.timeBased(),
                             "MESSAGE_CREATED",
-                            "bob",
-                            UUID.randomUUID().toString(),
+                            UUID.randomUUID(),
+                            UUID.randomUUID(),
                             "bucket_1")
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
@@ -400,13 +417,13 @@ class EventRepositoryTest extends BaseIntegrationTest {
                                     getSession()
                                             .prepare(
                                                     """
-                                                            SELECT payload
-                                                            FROM valoq_messages.events
-                                                            WHERE conversation_id = ?
-                                                              AND time_bucket = ?
-                                                              AND hash_bucket = ?
-                                                            """)
-                                            .bind("group-1", "2026-09", 0));
+                                                    SELECT payload
+                                                    FROM valoq_messages.events
+                                                    WHERE conversation_id = ?
+                                                      AND time_bucket = ?
+                                                      AND hash_bucket = ?
+                                                    """)
+                                            .bind(conversationId, "2026-09", 0));
 
             ResultSet bucket1 =
                     getSession()
@@ -414,13 +431,13 @@ class EventRepositoryTest extends BaseIntegrationTest {
                                     getSession()
                                             .prepare(
                                                     """
-                                                            SELECT payload
-                                                            FROM valoq_messages.events
-                                                            WHERE conversation_id = ?
-                                                              AND time_bucket = ?
-                                                              AND hash_bucket = ?
-                                                            """)
-                                            .bind("group-1", "2026-09", 1));
+                                                    SELECT payload
+                                                    FROM valoq_messages.events
+                                                    WHERE conversation_id = ?
+                                                      AND time_bucket = ?
+                                                      AND hash_bucket = ?
+                                                    """)
+                                            .bind(conversationId, "2026-09", 1));
 
             Assertions.assertEquals("bucket_0", bucket0.one().getString("payload"));
 
@@ -437,17 +454,19 @@ class EventRepositoryTest extends BaseIntegrationTest {
                 "Events in the same partition must be returned in event_id chronological order")
         void eventsMaintainChronologicalOrder() throws Exception {
 
+            UUID conversationId = UUID.randomUUID();
+
             UUID first = Uuids.timeBased();
 
             eventRepository
                     .saveEvent(
-                            "alice:bob",
+                            conversationId,
                             "2026-09",
                             0,
                             first,
                             "MESSAGE_CREATED",
-                            "alice",
-                            first.toString(),
+                            UUID.randomUUID(),
+                            UUID.randomUUID(),
                             "first")
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
@@ -458,13 +477,13 @@ class EventRepositoryTest extends BaseIntegrationTest {
 
             eventRepository
                     .saveEvent(
-                            "alice:bob",
+                            conversationId,
                             "2026-09",
                             0,
                             second,
                             "MESSAGE_CREATED",
-                            "bob",
-                            second.toString(),
+                            UUID.randomUUID(),
+                            UUID.randomUUID(),
                             "second")
                     .toCompletableFuture()
                     .get(5, TimeUnit.SECONDS);
@@ -475,15 +494,17 @@ class EventRepositoryTest extends BaseIntegrationTest {
                                     getSession()
                                             .prepare(
                                                     """
-                                                            SELECT event_id, payload
-                                                            FROM valoq_messages.events
-                                                            WHERE conversation_id = ?
-                                                              AND time_bucket = ?
-                                                              AND hash_bucket = ?
-                                                            """)
-                                            .bind("alice:bob", "2026-09", 0));
+                                                    SELECT event_id, payload
+                                                    FROM valoq_messages.events
+                                                    WHERE conversation_id = ?
+                                                      AND time_bucket = ?
+                                                      AND hash_bucket = ?
+                                                    """)
+                                            .bind(conversationId, "2026-09", 0));
 
             List<Row> rows = rs.all();
+            rows.sort(
+                    (left, right) -> left.getUuid("event_id").compareTo(right.getUuid("event_id")));
 
             Assertions.assertEquals(2, rows.size());
 
@@ -505,6 +526,8 @@ class EventRepositoryTest extends BaseIntegrationTest {
         @DisplayName("Should handle 30 simultaneous asynchronous event inserts")
         void saveEventConcurrentInsertsAllPersisted() {
 
+            UUID conversationId = UUID.randomUUID();
+
             int eventCount = 30;
 
             List<CompletableFuture<AsyncResultSet>> futures = new ArrayList<>();
@@ -518,13 +541,13 @@ class EventRepositoryTest extends BaseIntegrationTest {
                 CompletableFuture<AsyncResultSet> future =
                         eventRepository
                                 .saveEvent(
-                                        "alice:bob",
+                                        conversationId,
                                         "2026-09",
                                         0,
                                         eventId,
                                         "MESSAGE_CREATED",
-                                        "alice",
-                                        eventId.toString(),
+                                        UUID.randomUUID(),
+                                        UUID.randomUUID(),
                                         "payload_" + index)
                                 .toCompletableFuture();
 
@@ -539,13 +562,13 @@ class EventRepositoryTest extends BaseIntegrationTest {
                                     getSession()
                                             .prepare(
                                                     """
-                                                            SELECT count(*)
-                                                            FROM valoq_messages.events
-                                                            WHERE conversation_id = ?
-                                                              AND time_bucket = ?
-                                                              AND hash_bucket = ?
-                                                            """)
-                                            .bind("alice:bob", "2026-09", 0));
+                                                    SELECT count(*)
+                                                    FROM valoq_messages.events
+                                                    WHERE conversation_id = ?
+                                                      AND time_bucket = ?
+                                                      AND hash_bucket = ?
+                                                    """)
+                                            .bind(conversationId, "2026-09", 0));
 
             Row countRow = rs.one();
 

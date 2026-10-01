@@ -21,15 +21,32 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package server.model;
+package database;
 
-import java.time.Instant;
+import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
+import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import java.util.UUID;
+import java.util.concurrent.CompletionStage;
 
-public record Event(
-        UUID senderId,
-        UUID conversationId,
-        UUID eventId,
-        EventType eventType,
-        String payload,
-        Instant createdAt) {}
+public class UserEventRepository {
+
+    private final CqlSession session;
+    private final PreparedStatement selectStatement;
+
+    public UserEventRepository() {
+        this(CassandraManager.getSession());
+    }
+
+    public UserEventRepository(CqlSession session) {
+        this.session = session;
+        this.selectStatement =
+                session.prepare(
+                        "SELECT event_id, conversation_id FROM user_events WHERE user_id = ? AND time_bucket = ? AND event_id > ?");
+    }
+
+    public CompletionStage<AsyncResultSet> getUserEvents(
+            String userId, UUID cursor, String timeBucket) {
+        return session.executeAsync(selectStatement.bind(userId, timeBucket, cursor));
+    }
+}

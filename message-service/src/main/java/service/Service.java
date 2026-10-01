@@ -21,15 +21,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package server.model;
+package service;
 
-import java.time.Instant;
-import java.util.UUID;
-
-public record Event(
-        UUID senderId,
-        UUID conversationId,
-        UUID eventId,
-        EventType eventType,
-        String payload,
-        Instant createdAt) {}
+public interface Service<T> {
+    T serve();
+}

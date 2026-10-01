@@ -13,8 +13,8 @@ WITH replication = {
 --   - determining who receives/fans out new events
 -- The event log separately records membership changes.
 CREATE TABLE IF NOT EXISTS valoq_messages.conversation_members (
-    conversation_id text,
-    user_id text,
+    conversation_id uuid,
+    user_id uuid,
     role text,                  -- member | admin | owner
     joined_at timestamp,
     PRIMARY KEY ((conversation_id), user_id)
@@ -40,13 +40,13 @@ CREATE TABLE IF NOT EXISTS valoq_messages.conversation_members (
 --   YYYY-MM
 -- event_id is the ordering/cursor value.
 CREATE TABLE IF NOT EXISTS valoq_messages.events (
-    conversation_id text,
+    conversation_id uuid,
     time_bucket text,           -- YYYY-MM
     hash_bucket int,             -- 0..N-1
     event_id timeuuid,
     event_type text,
-    actor_id text,
-    entity_id text,
+    actor_id uuid,
+    entity_id uuid,
     payload text,
     PRIMARY KEY (
         (conversation_id, time_bucket, hash_bucket),
@@ -65,10 +65,10 @@ CREATE TABLE IF NOT EXISTS valoq_messages.events (
 --   reconnect
 --   global cross-conversation synchronization
 CREATE TABLE IF NOT EXISTS valoq_messages.user_events (
-    user_id text,
+    user_id uuid,
     time_bucket text,            -- YYYY-MM
     event_id timeuuid,
-    conversation_id text,
+    conversation_id uuid,
     PRIMARY KEY ((user_id, time_bucket), event_id)
 ) WITH CLUSTERING ORDER BY (event_id ASC);
 

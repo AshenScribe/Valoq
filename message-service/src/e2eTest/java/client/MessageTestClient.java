@@ -102,7 +102,7 @@ public class MessageTestClient implements AutoCloseable {
         this.channel = bootstrap.connect(host, port).sync().channel();
     }
 
-    public String init(String userId) {
+    public String init(UUID userId) {
         try {
             String token = createToken(userId);
 
@@ -115,7 +115,7 @@ public class MessageTestClient implements AutoCloseable {
         }
     }
 
-    public String createToken(String userId) throws Exception {
+    public String createToken(UUID userId) throws Exception {
 
         String header =
                 Base64.getUrlEncoder()
@@ -144,27 +144,9 @@ public class MessageTestClient implements AutoCloseable {
         return contentToSign + "." + signatureBase64;
     }
 
-    public void sendMessage(
-            String conversationId, String clientMessageId, String createdAt, String base64Payload) {
+    public void sendMessage(UUID conversationId, String createdAt, String base64Payload) {
 
-        send(
-                "SEND "
-                        + conversationId
-                        + " "
-                        + clientMessageId
-                        + " "
-                        + createdAt
-                        + " "
-                        + base64Payload);
-    }
-
-    public void sendMessage(String conversationId, String base64Payload) {
-
-        sendMessage(
-                conversationId,
-                UUID.randomUUID().toString(),
-                "2026-09-30T17:30:00Z",
-                base64Payload);
+        send("SEND " + conversationId + " " + createdAt + " " + base64Payload);
     }
 
     public String readLine() {

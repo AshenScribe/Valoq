@@ -63,7 +63,7 @@ public class MessageRouter {
                         eventId,
                         event.eventType().name(),
                         event.senderId(),
-                        event.clientMessageId(),
+                        event.eventId(),
                         event.payload())
                 .thenApply(
                         result -> {

@@ -1,8 +1,8 @@
 plugins {
     id 'java'
     id 'application'
-    id 'com.diffplug.spotless' version '7.2.1'
     id 'checkstyle'
+    id 'com.diffplug.spotless' version '7.2.1'
 }
 
 def targetArch = project.findProperty('targetArch') ?: 'linux-x86_64'

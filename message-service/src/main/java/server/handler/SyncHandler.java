@@ -25,59 +25,55 @@ package server.handler;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import java.time.Instant;
-import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import server.MessageRouter;
 import server.MessageServer;
 import server.Session;
 import server.model.Event;
-import server.model.EventType;
+import service.GetOutOfSyncEvents;
 
-/**
- * Handler for processing chat messages sent by clients. It listens for messages in the format "SEND
- * <recipientId> <client_created_at> <payload>" and routes them to the appropriate recipients using
- * the MessageRouter.
- */
-public class ChatMessageHandler extends SimpleChannelInboundHandler<String> {
-
-    private static final Pattern SEND_PATTERN =
-            Pattern.compile("^SEND ([^\\s]{1,128}) ([^\\s]+) ([^\\s]+)$");
-    private final MessageRouter messageRouter;
-
-    public ChatMessageHandler(MessageRouter messageRouter) {
-        this.messageRouter = messageRouter;
-    }
+public class SyncHandler extends SimpleChannelInboundHandler<String> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, String msg) {
-        Matcher matcher = SEND_PATTERN.matcher(msg);
-        if (!matcher.matches()) {
-            ctx.writeAndFlush("ERROR Invalid SEND format");
+
+        if (!msg.startsWith("SYNC")) {
+            ctx.fireChannelRead(msg);
             return;
         }
 
         Session session =
                 ctx.channel().attr(MessageServer.MessageServerInitializer.SESSION_KEY).get();
 
-        if (session == null || session.getUserId() == null) {
-            ctx.writeAndFlush("ERROR Session not initialized");
+        if (session == null) {
+            ctx.writeAndFlush("ERROR: Session not initialized\n");
             return;
         }
 
-        UUID senderId = UUID.fromString(session.getUserId());
-        UUID conversationId = UUID.fromString(matcher.group(1));
-        String timestamp = matcher.group(2);
-        String payload = matcher.group(3);
-        Event event =
-                new Event(
-                        senderId,
-                        conversationId,
-                        UUID.randomUUID(),
-                        EventType.MESSAGE_CREATED,
-                        payload,
-                        Instant.parse(timestamp));
-        messageRouter.route(event);
+        String userId = session.getUserId();
+        String eventId = msg.substring(5).trim();
+
+        GetOutOfSyncEvents getOutOfSyncEvents = new GetOutOfSyncEvents(userId, eventId);
+
+        getOutOfSyncEvents
+                .serve()
+                .thenAccept(
+                        events -> {
+                            for (Event event : events) {
+                                String response =
+                                        String.format(
+                                                "EVENT %s %s %s %s %s\n",
+                                                event.eventType().name(),
+                                                event.eventId(),
+                                                event.conversationId(),
+                                                event.senderId(),
+                                                event.payload());
+                                ctx.write(response);
+                            }
+                            ctx.flush();
+                        })
+                .exceptionally(
+                        error -> {
+                            ctx.writeAndFlush("ERROR: SYNC failed\n");
+                            return null;
+                        });
     }
 }

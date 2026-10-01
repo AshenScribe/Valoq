@@ -29,6 +29,7 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class ConversationMemberRepository {
@@ -71,24 +72,24 @@ public class ConversationMemberRepository {
                         """);
     }
 
-    public CompletableFuture<Void> addMember(String conversationId, String userId, String role) {
+    public CompletableFuture<Void> addMember(UUID conversationId, UUID userId, String role) {
 
         return session.executeAsync(insertMember.bind(conversationId, userId, role, Instant.now()))
                 .toCompletableFuture()
                 .thenApply(ignored -> null);
     }
 
-    public CompletableFuture<Void> removeMember(String conversationId, String userId) {
+    public CompletableFuture<Void> removeMember(UUID conversationId, UUID userId) {
 
         return session.executeAsync(deleteMember.bind(conversationId, userId))
                 .toCompletableFuture()
                 .thenApply(ignored -> null);
     }
 
-    public List<String> findMemberIds(String conversationId) {
+    public List<String> findMemberIds(UUID conversationId) {
         List<String> members = new ArrayList<>();
         for (Row row : session.execute(findMembers.bind(conversationId))) {
-            members.add(row.getString("user_id"));
+            members.add(row.getUuid("user_id").toString());
         }
         return members;
     }

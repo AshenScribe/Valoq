@@ -30,6 +30,7 @@ import config.ServerConfig;
 import database.CassandraManager;
 import java.security.KeyPair;
 import java.util.Map;
+import java.util.UUID;
 import org.aeonbits.owner.ConfigFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -43,9 +44,7 @@ public abstract class BaseIntegrationTest {
     protected static final CassandraContainer CASSANDRA_CONTAINER =
             new CassandraContainer("cassandra:5.0")
                     .withConfigurationOverride("cassandra-auth")
-                    .withInitScript("init.cql")
-                    .withCreateContainerCmdModifier(
-                            cmd -> cmd.withName("cassandra-integration-test"));
+                    .withInitScript("init.cql");
 
     private static MessageServer server;
     private static CqlSession session;
@@ -121,7 +120,7 @@ public abstract class BaseIntegrationTest {
         return new MessageTestClient("127.0.0.1", serverPort, keyPair.getPrivate());
     }
 
-    protected void addConversationMember(String conversationId, String userId) {
+    protected void addConversationMember(UUID conversationId, UUID userId) {
 
         session.execute(
                 session.prepare(
@@ -129,9 +128,9 @@ public abstract class BaseIntegrationTest {
                         .bind(conversationId, userId, "MEMBER", java.time.Instant.now()));
     }
 
-    protected void addConversationMembers(String conversationId, String... userIds) {
+    protected void addConversationMembers(UUID conversationId, UUID... userIds) {
 
-        for (String userId : userIds) {
+        for (UUID userId : userIds) {
             addConversationMember(conversationId, userId);
         }
     }

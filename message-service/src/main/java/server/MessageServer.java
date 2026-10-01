@@ -49,6 +49,7 @@ import io.netty.util.AttributeKey;
 import java.nio.charset.StandardCharsets;
 import server.handler.ConnectionLifecycleHandler;
 import server.handler.InitVerbHandler;
+import server.handler.SyncHandler;
 
 public class MessageServer {
 
@@ -141,6 +142,7 @@ public class MessageServer {
                     .addLast(
                             "connectionLifecycleHandler",
                             new ConnectionLifecycleHandler(connectionTracker));
+            ch.pipeline().addLast("syncHandler", new SyncHandler());
         }
     }
 }

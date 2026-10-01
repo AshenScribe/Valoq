@@ -21,15 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package server.model;
+package database.model;
 
-import java.time.Instant;
-import java.util.UUID;
-
-public record Event(
-        UUID senderId,
-        UUID conversationId,
-        UUID eventId,
-        EventType eventType,
-        String payload,
-        Instant createdAt) {}
+public record UserEvent() {}

@@ -30,9 +30,11 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import database.ConversationMemberRepository;
 import database.EventRepository;
 import io.netty.channel.embedded.EmbeddedChannel;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -49,10 +51,10 @@ import server.Session;
 
 class ChatMessageHandlerTest {
 
-    private static final String TEST_USER_ID = "user123";
-    private static final String CONVERSATION_ID = "conversation-123";
-    private static final String CLIENT_MESSAGE_ID = "550e8400-e29b-41d4-a716-446655440000";
+    private static final UUID TEST_USER_ID = UUID.randomUUID();
+    private static final UUID CONVERSATION_ID = UUID.randomUUID();
     private static final String CREATED_AT = "2026-09-30T17:30:00Z";
+    private static final String ALICE_UUID = UUID.randomUUID().toString();
 
     private EmbeddedChannel senderChannel;
     private ConnectionTracker connectionTracker;
@@ -68,13 +70,13 @@ class ChatMessageHandlerTest {
         memberRepository = mock(ConversationMemberRepository.class);
 
         when(eventRepository.saveEvent(
-                        anyString(),
+                        nullable(UUID.class),
                         anyString(),
                         anyInt(),
                         any(UUID.class),
                         anyString(),
-                        anyString(),
-                        nullable(String.class),
+                        nullable(UUID.class),
+                        nullable(UUID.class),
                         anyString()))
                 .thenReturn(CompletableFuture.completedFuture(null));
 
@@ -85,7 +87,7 @@ class ChatMessageHandlerTest {
                                         connectionTracker, eventRepository, memberRepository)));
 
         Session session = new Session();
-        session.setUserId(TEST_USER_ID);
+        session.setUserId(TEST_USER_ID.toString());
 
         senderChannel.attr(MessageServer.MessageServerInitializer.SESSION_KEY).set(session);
     }
@@ -105,17 +107,9 @@ class ChatMessageHandlerTest {
             connectionTracker.register("bob", recipientChannel);
 
             when(memberRepository.findMemberIds(CONVERSATION_ID))
-                    .thenReturn(List.of(TEST_USER_ID, "bob"));
+                    .thenReturn(List.of(TEST_USER_ID.toString(), "bob"));
 
-            String message =
-                    "SEND "
-                            + CONVERSATION_ID
-                            + " "
-                            + CLIENT_MESSAGE_ID
-                            + " "
-                            + CREATED_AT
-                            + " "
-                            + base64Payload;
+            String message = "SEND " + CONVERSATION_ID + " " + CREATED_AT + " " + base64Payload;
 
             senderChannel.writeInbound(message);
 
@@ -124,8 +118,8 @@ class ChatMessageHandlerTest {
             Assertions.assertNotNull(outbound);
             Assertions.assertTrue(outbound.toString().startsWith("EVENT MESSAGE_CREATED "));
 
-            Assertions.assertTrue(outbound.toString().contains(CONVERSATION_ID));
-            Assertions.assertTrue(outbound.toString().contains(TEST_USER_ID));
+            Assertions.assertTrue(outbound.toString().contains(CONVERSATION_ID.toString()));
+            Assertions.assertTrue(outbound.toString().contains(TEST_USER_ID.toString()));
             Assertions.assertTrue(outbound.toString().endsWith(base64Payload));
 
         } finally {
@@ -153,15 +147,13 @@ class ChatMessageHandlerTest {
             connectionTracker.register("bob", recipientChannel);
 
             when(memberRepository.findMemberIds(CONVERSATION_ID))
-                    .thenReturn(List.of(TEST_USER_ID, "bob"));
+                    .thenReturn(List.of(TEST_USER_ID.toString(), "bob"));
 
             senderChannel.writeInbound(
                     "SEND "
                             + CONVERSATION_ID
                             + " "
-                            + CLIENT_MESSAGE_ID
-                            + " "
-                            + CREATED_AT
+                            + Instant.parse(CREATED_AT)
                             + " "
                             + base64Payload);
 
@@ -169,6 +161,8 @@ class ChatMessageHandlerTest {
 
             Assertions.assertNotNull(outbound);
             Assertions.assertTrue(outbound.toString().startsWith("EVENT MESSAGE_CREATED "));
+            Assertions.assertTrue(outbound.toString().contains(CONVERSATION_ID.toString()));
+            Assertions.assertTrue(outbound.toString().contains(TEST_USER_ID.toString()));
             Assertions.assertTrue(outbound.toString().endsWith(base64Payload));
 
         } finally {
@@ -185,37 +179,43 @@ class ChatMessageHandlerTest {
             connectionTracker.register("bob", recipientChannel);
 
             when(memberRepository.findMemberIds(CONVERSATION_ID))
-                    .thenReturn(List.of(TEST_USER_ID, "bob"));
+                    .thenReturn(List.of(TEST_USER_ID.toString(), "bob"));
 
+            CompletableFuture<AsyncResultSet> firstSave = new CompletableFuture<>();
+            CompletableFuture<AsyncResultSet> secondSave = new CompletableFuture<>();
+
+            when(eventRepository.saveEvent(
+                            nullable(UUID.class),
+                            anyString(),
+                            anyInt(),
+                            any(UUID.class),
+                            anyString(),
+                            nullable(UUID.class),
+                            nullable(UUID.class),
+                            anyString()))
+                    .thenReturn(firstSave)
+                    .thenReturn(secondSave);
             senderChannel.writeInbound(
-                    "SEND "
-                            + CONVERSATION_ID
-                            + " "
-                            + CLIENT_MESSAGE_ID
-                            + " "
-                            + CREATED_AT
-                            + " "
-                            + "SGVsbG8=");
-
-            String secondClientMessageId = "660e8400-e29b-41d4-a716-446655440000";
-
-            senderChannel.writeInbound(
-                    "SEND "
-                            + CONVERSATION_ID
-                            + " "
-                            + secondClientMessageId
-                            + " "
-                            + CREATED_AT
-                            + " "
-                            + "V29ybGQ=");
-
+                    "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "SGVsbG8=");
+            Assertions.assertNull(recipientChannel.readOutbound());
+            firstSave.complete(null);
             Object first = recipientChannel.readOutbound();
-            Object second = recipientChannel.readOutbound();
 
             Assertions.assertNotNull(first);
-            Assertions.assertNotNull(second);
-
+            Assertions.assertTrue(first.toString().startsWith("EVENT MESSAGE_CREATED "));
+            Assertions.assertTrue(first.toString().contains(CONVERSATION_ID.toString()));
+            Assertions.assertTrue(first.toString().contains(TEST_USER_ID.toString()));
             Assertions.assertTrue(first.toString().endsWith("SGVsbG8="));
+            senderChannel.writeInbound(
+                    "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "V29ybGQ=");
+            Assertions.assertNull(recipientChannel.readOutbound());
+            secondSave.complete(null);
+            Object second = recipientChannel.readOutbound();
+
+            Assertions.assertNotNull(second);
+            Assertions.assertTrue(second.toString().startsWith("EVENT MESSAGE_CREATED "));
+            Assertions.assertTrue(second.toString().contains(CONVERSATION_ID.toString()));
+            Assertions.assertTrue(second.toString().contains(TEST_USER_ID.toString()));
             Assertions.assertTrue(second.toString().endsWith("V29ybGQ="));
 
         } finally {
@@ -237,14 +237,7 @@ class ChatMessageHandlerTest {
                     .thenReturn(List.of("bob", "alice"));
 
             senderChannel.writeInbound(
-                    "SEND "
-                            + CONVERSATION_ID
-                            + " "
-                            + CLIENT_MESSAGE_ID
-                            + " "
-                            + CREATED_AT
-                            + " "
-                            + "SGVsbG8=");
+                    "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "SGVsbG8=");
 
             Object bobMessage = bobChannel.readOutbound();
             Object aliceMessage = aliceChannel.readOutbound();
@@ -252,8 +245,8 @@ class ChatMessageHandlerTest {
             Assertions.assertNotNull(bobMessage);
             Assertions.assertNotNull(aliceMessage);
 
-            Assertions.assertTrue(bobMessage.toString().contains(CONVERSATION_ID));
-            Assertions.assertTrue(aliceMessage.toString().contains(CONVERSATION_ID));
+            Assertions.assertTrue(bobMessage.toString().contains(CONVERSATION_ID.toString()));
+            Assertions.assertTrue(aliceMessage.toString().contains(CONVERSATION_ID.toString()));
 
             Assertions.assertTrue(bobMessage.toString().endsWith("SGVsbG8="));
             Assertions.assertTrue(aliceMessage.toString().endsWith("SGVsbG8="));
@@ -268,18 +261,16 @@ class ChatMessageHandlerTest {
     @ValueSource(
             strings = {
                 "SEND",
-                "SEND conversation-123",
-                "SEND conversation-123 client-id",
-                "SEND conversation-123 client-id 2026-09-30T17:30:00Z",
-                "SEND  conversation-123 client-id 2026-09-30T17:30:00Z SGVsbG8=",
-                " SEND conversation-123 client-id 2026-09-30T17:30:00Z SGVsbG8=",
-                "SEND conversation-123 client-id 2026-09-30T17:30:00Z SGVsbG8= ",
-                "send conversation-123 client-id 2026-09-30T17:30:00Z SGVsbG8="
+                "SEND ",
+                "SEND 5f08f2b9-b319-44b1-a007-9e1b9ead09fc",
+                "SEND 5f08f2b9-b319-44b1-a007-9e1b9ead09fc 2026-09-30T17:30:00Z",
+                "SEND  5f08f2b9-b319-44b1-a007-9e1b9ead09fc 2026-09-30T17:30:00Z SGVsbG8=",
+                " SEND 5f08f2b9-b319-44b1-a007-9e1b9ead09fc 2026-09-30T17:30:00Z SGVsbG8=",
+                "SEND 5f08f2b9-b319-44b1-a007-9e1b9ead09fc 2026-09-30T17:30:00Z SGVsbG8= ",
+                "send 5f08f2b9-b319-44b1-a007-9e1b9ead09fc 2026-09-30T17:30:00Z SGVsbG8="
             })
     void testInvalidSendMessageFormat(String invalidMessage) {
-
         senderChannel.writeInbound(invalidMessage);
-
         Assertions.assertEquals("ERROR Invalid SEND format", senderChannel.readOutbound());
     }
 
@@ -289,14 +280,7 @@ class ChatMessageHandlerTest {
         when(memberRepository.findMemberIds(CONVERSATION_ID)).thenReturn(List.of("bob"));
 
         senderChannel.writeInbound(
-                "SEND "
-                        + CONVERSATION_ID
-                        + " "
-                        + CLIENT_MESSAGE_ID
-                        + " "
-                        + CREATED_AT
-                        + " "
-                        + "SGVsbG8=");
+                "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "SGVsbG8=");
 
         /*
          * The event is persisted even though Bob is offline.
@@ -316,27 +300,20 @@ class ChatMessageHandlerTest {
             connectionTracker.register("bob", recipientChannel);
 
             when(memberRepository.findMemberIds(CONVERSATION_ID))
-                    .thenReturn(List.of("alice123", "bob"));
+                    .thenReturn(List.of(ALICE_UUID, "bob"));
 
             Session session = new Session();
-            session.setUserId("alice123");
+            session.setUserId(ALICE_UUID);
 
             senderChannel.attr(MessageServer.MessageServerInitializer.SESSION_KEY).set(session);
 
             senderChannel.writeInbound(
-                    "SEND "
-                            + CONVERSATION_ID
-                            + " "
-                            + CLIENT_MESSAGE_ID
-                            + " "
-                            + CREATED_AT
-                            + " "
-                            + "SGVsbG8=");
+                    "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "SGVsbG8=");
 
             Object outbound = recipientChannel.readOutbound();
 
             Assertions.assertNotNull(outbound);
-            Assertions.assertTrue(outbound.toString().contains("alice123"));
+            Assertions.assertTrue(outbound.toString().contains(ALICE_UUID));
 
         } finally {
             recipientChannel.finishAndReleaseAll();

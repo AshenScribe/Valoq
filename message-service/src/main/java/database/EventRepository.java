@@ -26,13 +26,18 @@ package database;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import com.datastax.oss.driver.api.core.cql.Row;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
+import server.model.Event;
+import server.model.EventType;
 
 public class EventRepository {
 
     private final CqlSession session;
     private final PreparedStatement insertStatement;
+    private final PreparedStatement selectStatement;
 
     public EventRepository() {
         this(CassandraManager.getSession());
@@ -43,16 +48,19 @@ public class EventRepository {
         this.insertStatement =
                 session.prepare(
                         "INSERT INTO events (conversation_id, time_bucket, hash_bucket, event_id, event_type, actor_id, entity_id, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        this.selectStatement =
+                session.prepare(
+                        "SELECT * FROM events WHERE conversation_id = ? AND time_bucket = ? AND hash_bucket = ? AND event_id > ?");
     }
 
     public CompletionStage<AsyncResultSet> saveEvent(
-            String conversationId,
+            UUID conversationId,
             String timeBucket,
             int hashBucket,
             UUID eventId,
             String eventType,
-            String actorId,
-            String entityId,
+            UUID actorId,
+            UUID entityId,
             String payload) {
 
         return session.executeAsync(
@@ -65,5 +73,29 @@ public class EventRepository {
                         actorId,
                         entityId,
                         payload));
+    }
+
+    public CompletionStage<Optional<Event>> getEvents(
+            UUID conversationId, String timeBucket, int hashBucket, UUID eventId) {
+
+        return session.executeAsync(
+                        selectStatement.bind(conversationId, timeBucket, hashBucket, eventId))
+                .thenApply(
+                        result -> {
+                            Row row = result.one();
+
+                            if (row == null) {
+                                return Optional.empty();
+                            }
+
+                            return Optional.of(
+                                    new Event(
+                                            row.getUuid("actor_id"),
+                                            row.getUuid("conversation_id"),
+                                            row.getUuid("entity_id"),
+                                            EventType.valueOf(row.getString("event_type")),
+                                            row.getString("payload"),
+                                            row.getInstant("created_at")));
+                        });
     }
 }
