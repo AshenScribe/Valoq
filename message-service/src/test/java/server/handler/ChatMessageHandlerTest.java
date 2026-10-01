@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import database.ConversationMemberRepository;
 import database.EventRepository;
+import database.UserEventRepository;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.time.Instant;
 import java.util.List;
@@ -54,13 +55,15 @@ class ChatMessageHandlerTest {
     private static final UUID TEST_USER_ID = UUID.randomUUID();
     private static final UUID CONVERSATION_ID = UUID.randomUUID();
     private static final String CREATED_AT = "2026-09-30T17:30:00Z";
-    private static final String ALICE_UUID = UUID.randomUUID().toString();
+    private static final UUID ALICE_USER_ID = UUID.randomUUID();
+    private static final UUID BOB_USER_ID = UUID.randomUUID();
 
     private EmbeddedChannel senderChannel;
     private ConnectionTracker connectionTracker;
 
     private EventRepository eventRepository;
     private ConversationMemberRepository memberRepository;
+    private UserEventRepository userEventRepository;
 
     @BeforeEach
     void setup() {
@@ -68,7 +71,7 @@ class ChatMessageHandlerTest {
 
         eventRepository = mock(EventRepository.class);
         memberRepository = mock(ConversationMemberRepository.class);
-
+        userEventRepository = mock(UserEventRepository.class);
         when(eventRepository.saveEvent(
                         nullable(UUID.class),
                         anyString(),
@@ -79,15 +82,20 @@ class ChatMessageHandlerTest {
                         nullable(UUID.class),
                         anyString()))
                 .thenReturn(CompletableFuture.completedFuture(null));
-
+        when(userEventRepository.saveUserEvent(
+                        any(UUID.class), anyString(), any(UUID.class), any(UUID.class)))
+                .thenReturn(CompletableFuture.completedFuture(null));
         senderChannel =
                 new EmbeddedChannel(
                         new ChatMessageHandler(
                                 new MessageRouter(
-                                        connectionTracker, eventRepository, memberRepository)));
+                                        connectionTracker,
+                                        eventRepository,
+                                        memberRepository,
+                                        userEventRepository)));
 
         Session session = new Session();
-        session.setUserId(TEST_USER_ID.toString());
+        session.setUserId(TEST_USER_ID);
 
         senderChannel.attr(MessageServer.MessageServerInitializer.SESSION_KEY).set(session);
     }
@@ -104,10 +112,11 @@ class ChatMessageHandlerTest {
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
-            connectionTracker.register("bob", recipientChannel);
+            connectionTracker.register(BOB_USER_ID, recipientChannel);
 
             when(memberRepository.findMemberIds(CONVERSATION_ID))
-                    .thenReturn(List.of(TEST_USER_ID.toString(), "bob"));
+                    .thenReturn(
+                            CompletableFuture.completedFuture(List.of(TEST_USER_ID, BOB_USER_ID)));
 
             String message = "SEND " + CONVERSATION_ID + " " + CREATED_AT + " " + base64Payload;
 
@@ -144,10 +153,11 @@ class ChatMessageHandlerTest {
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
-            connectionTracker.register("bob", recipientChannel);
+            connectionTracker.register(BOB_USER_ID, recipientChannel);
 
             when(memberRepository.findMemberIds(CONVERSATION_ID))
-                    .thenReturn(List.of(TEST_USER_ID.toString(), "bob"));
+                    .thenReturn(
+                            CompletableFuture.completedFuture(List.of(TEST_USER_ID, BOB_USER_ID)));
 
             senderChannel.writeInbound(
                     "SEND "
@@ -176,10 +186,11 @@ class ChatMessageHandlerTest {
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
-            connectionTracker.register("bob", recipientChannel);
+            connectionTracker.register(BOB_USER_ID, recipientChannel);
 
             when(memberRepository.findMemberIds(CONVERSATION_ID))
-                    .thenReturn(List.of(TEST_USER_ID.toString(), "bob"));
+                    .thenReturn(
+                            CompletableFuture.completedFuture(List.of(TEST_USER_ID, BOB_USER_ID)));
 
             CompletableFuture<AsyncResultSet> firstSave = new CompletableFuture<>();
             CompletableFuture<AsyncResultSet> secondSave = new CompletableFuture<>();
@@ -230,11 +241,12 @@ class ChatMessageHandlerTest {
         EmbeddedChannel aliceChannel = new EmbeddedChannel();
 
         try {
-            connectionTracker.register("bob", bobChannel);
-            connectionTracker.register("alice", aliceChannel);
+            connectionTracker.register(BOB_USER_ID, bobChannel);
+            connectionTracker.register(ALICE_USER_ID, aliceChannel);
 
             when(memberRepository.findMemberIds(CONVERSATION_ID))
-                    .thenReturn(List.of("bob", "alice"));
+                    .thenReturn(
+                            CompletableFuture.completedFuture(List.of(BOB_USER_ID, ALICE_USER_ID)));
 
             senderChannel.writeInbound(
                     "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "SGVsbG8=");
@@ -277,7 +289,8 @@ class ChatMessageHandlerTest {
     @Test
     void testSendToConversationWithNoConnectedMembers() {
 
-        when(memberRepository.findMemberIds(CONVERSATION_ID)).thenReturn(List.of("bob"));
+        when(memberRepository.findMemberIds(CONVERSATION_ID))
+                .thenReturn(CompletableFuture.completedFuture(List.of(BOB_USER_ID)));
 
         senderChannel.writeInbound(
                 "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "SGVsbG8=");
@@ -297,13 +310,14 @@ class ChatMessageHandlerTest {
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
-            connectionTracker.register("bob", recipientChannel);
+            connectionTracker.register(BOB_USER_ID, recipientChannel);
 
             when(memberRepository.findMemberIds(CONVERSATION_ID))
-                    .thenReturn(List.of(ALICE_UUID, "bob"));
+                    .thenReturn(
+                            CompletableFuture.completedFuture(List.of(ALICE_USER_ID, BOB_USER_ID)));
 
             Session session = new Session();
-            session.setUserId(ALICE_UUID);
+            session.setUserId(ALICE_USER_ID);
 
             senderChannel.attr(MessageServer.MessageServerInitializer.SESSION_KEY).set(session);
 
@@ -313,7 +327,7 @@ class ChatMessageHandlerTest {
             Object outbound = recipientChannel.readOutbound();
 
             Assertions.assertNotNull(outbound);
-            Assertions.assertTrue(outbound.toString().contains(ALICE_UUID));
+            Assertions.assertTrue(outbound.toString().contains(ALICE_USER_ID.toString()));
 
         } finally {
             recipientChannel.finishAndReleaseAll();

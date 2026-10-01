@@ -26,6 +26,7 @@ package database;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 
@@ -33,6 +34,7 @@ public class UserEventRepository {
 
     private final CqlSession session;
     private final PreparedStatement selectStatement;
+    private final PreparedStatement insertStatement;
 
     public UserEventRepository() {
         this(CassandraManager.getSession());
@@ -40,13 +42,28 @@ public class UserEventRepository {
 
     public UserEventRepository(CqlSession session) {
         this.session = session;
-        this.selectStatement =
-                session.prepare(
-                        "SELECT event_id, conversation_id FROM user_events WHERE user_id = ? AND time_bucket = ? AND event_id > ?");
+        SimpleStatement selectSimple =
+                SimpleStatement.newInstance(
+                                "SELECT event_id, conversation_id FROM user_events WHERE user_id = ? AND time_bucket = ? AND event_id > ?")
+                        .setIdempotent(true);
+
+        SimpleStatement insertSimple =
+                SimpleStatement.newInstance(
+                                "INSERT INTO user_events (user_id, time_bucket, event_id, conversation_id) VALUES (?, ?, ?, ?)")
+                        .setIdempotent(true);
+
+        this.selectStatement = session.prepare(selectSimple);
+        this.insertStatement = session.prepare(insertSimple);
     }
 
     public CompletionStage<AsyncResultSet> getUserEvents(
-            String userId, UUID cursor, String timeBucket) {
+            UUID userId, UUID cursor, String timeBucket) {
         return session.executeAsync(selectStatement.bind(userId, timeBucket, cursor));
+    }
+
+    public CompletionStage<AsyncResultSet> saveUserEvent(
+            UUID userId, String timeBucket, UUID eventId, UUID conversationId) {
+        return session.executeAsync(
+                insertStatement.bind(userId, timeBucket, eventId, conversationId));
     }
 }

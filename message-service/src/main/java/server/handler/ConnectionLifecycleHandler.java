@@ -25,9 +25,8 @@ package server.handler;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import server.ClientConnection;
 import server.ConnectionTracker;
-import server.MessageServer;
-import server.Session;
 
 public class ConnectionLifecycleHandler extends ChannelInboundHandlerAdapter {
 
@@ -39,12 +38,11 @@ public class ConnectionLifecycleHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
+        ClientConnection connection = ClientConnection.get(ctx.channel());
 
-        Session session =
-                ctx.channel().attr(MessageServer.MessageServerInitializer.SESSION_KEY).get();
-
-        if (session != null && session.getUserId() != null) {
-            connectionTracker.unregister(session.getUserId(), ctx.channel());
+        if (connection != null && connection.getUserId() != null) {
+            connectionTracker.unregister(connection.getUserId(), ctx.channel());
+            connection.markClosing();
         }
 
         ctx.fireChannelInactive();

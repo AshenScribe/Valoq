@@ -24,13 +24,16 @@
 package database;
 
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Row;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 public class ConversationMemberRepository {
 
@@ -47,49 +50,59 @@ public class ConversationMemberRepository {
     public ConversationMemberRepository(CqlSession session) {
         this.session = session;
 
-        this.insertMember =
-                session.prepare(
-                        """
+        SimpleStatement insertSimple =
+                SimpleStatement.newInstance(
+                                """
                         INSERT INTO valoq_messages.conversation_members
                             (conversation_id, user_id, role, joined_at)
                         VALUES (?, ?, ?, ?)
-                        """);
+                        """)
+                        .setIdempotent(true);
 
-        this.deleteMember =
-                session.prepare(
-                        """
+        SimpleStatement deleteSimple =
+                SimpleStatement.newInstance(
+                                """
                         DELETE FROM valoq_messages.conversation_members
                         WHERE conversation_id = ?
                           AND user_id = ?
-                        """);
+                        """)
+                        .setIdempotent(true);
 
-        this.findMembers =
-                session.prepare(
-                        """
+        SimpleStatement findSimple =
+                SimpleStatement.newInstance(
+                                """
                         SELECT user_id
                         FROM valoq_messages.conversation_members
                         WHERE conversation_id = ?
-                        """);
+                        """)
+                        .setIdempotent(true);
+
+        this.insertMember = session.prepare(insertSimple);
+        this.deleteMember = session.prepare(deleteSimple);
+        this.findMembers = session.prepare(findSimple);
     }
 
     public CompletableFuture<Void> addMember(UUID conversationId, UUID userId, String role) {
-
         return session.executeAsync(insertMember.bind(conversationId, userId, role, Instant.now()))
                 .toCompletableFuture()
                 .thenApply(ignored -> null);
     }
 
     public CompletableFuture<Void> removeMember(UUID conversationId, UUID userId) {
-
         return session.executeAsync(deleteMember.bind(conversationId, userId))
                 .toCompletableFuture()
                 .thenApply(ignored -> null);
     }
 
-    public List<String> findMemberIds(UUID conversationId) {
-        List<String> members = new ArrayList<>();
-        for (Row row : session.execute(findMembers.bind(conversationId))) {
-            members.add(row.getUuid("user_id").toString());
+    public CompletionStage<List<UUID>> findMemberIds(UUID conversationId) {
+        return session.executeAsync(findMembers.bind(conversationId))
+                .thenApply(this::extractMemberUuids);
+    }
+
+    private List<UUID> extractMemberUuids(AsyncResultSet rs) {
+        List<UUID> members = new ArrayList<>();
+        for (Row row : rs.currentPage()) {
+            members.add(row.getUuid("user_id"));
         }
         return members;
     }

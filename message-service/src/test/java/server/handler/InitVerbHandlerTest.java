@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 
 import database.ConversationMemberRepository;
 import database.EventRepository;
+import database.UserEventRepository;
 import io.netty.channel.DefaultChannelId;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.nio.charset.StandardCharsets;
@@ -35,6 +36,7 @@ import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.util.Base64;
+import java.util.UUID;
 import jwt.JwtUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -58,6 +60,7 @@ class InitVerbHandlerTest {
 
     private EventRepository eventRepository;
     private ConversationMemberRepository memberRepository;
+    private UserEventRepository userEventRepository;
 
     @BeforeAll
     static void initJwtKey() throws Exception {
@@ -79,18 +82,20 @@ class InitVerbHandlerTest {
 
         eventRepository = mock(EventRepository.class);
         memberRepository = mock(ConversationMemberRepository.class);
+        userEventRepository = mock(database.UserEventRepository.class);
 
         channel.attr(MessageServer.MessageServerInitializer.SESSION_KEY).set(session);
 
         MessageRouter messageRouter =
-                new MessageRouter(connectionTracker, eventRepository, memberRepository);
+                new MessageRouter(
+                        connectionTracker, eventRepository, memberRepository, userEventRepository);
 
         channel.pipeline().addLast(new InitVerbHandler(connectionTracker, messageRouter));
     }
 
     @Test
     public void successOnValidJwtToken() throws Exception {
-        String expectedUserId = "user123";
+        UUID expectedUserId = UUID.randomUUID();
 
         String validJwt =
                 createJwtToken("{\"sub\":\"" + expectedUserId + "\"}", keyPair.getPrivate());

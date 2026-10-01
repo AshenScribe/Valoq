@@ -23,16 +23,7 @@
  */
 package server;
 
-import java.util.UUID;
-
-public class Session {
-    private UUID userId;
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public void setUserId(UUID userId) {
-        this.userId = userId;
-    }
+public enum ConnectionStage {
+    CONNECTED,
+    AUTHENTICATED,
 }

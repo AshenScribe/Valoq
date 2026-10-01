@@ -23,10 +23,13 @@
  */
 package server.handler;
 
+import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import server.MessageRouter;
@@ -35,16 +38,18 @@ import server.Session;
 import server.model.Event;
 import server.model.EventType;
 
-/**
- * Handler for processing chat messages sent by clients. It listens for messages in the format "SEND
- * <recipientId> <client_created_at> <payload>" and routes them to the appropriate recipients using
- * the MessageRouter.
- */
 public class ChatMessageHandler extends SimpleChannelInboundHandler<String> {
 
     private static final Pattern SEND_PATTERN =
             Pattern.compile("^SEND ([^\\s]{1,128}) ([^\\s]+) ([^\\s]+)$");
+
+    private static final int HIGH_WATERMARK = 64;
+    private static final int LOW_WATERMARK = 32;
+
     private final MessageRouter messageRouter;
+    private final AtomicInteger inFlightCount = new AtomicInteger(0);
+
+    private CompletableFuture<?> lastRouteFuture = CompletableFuture.completedFuture(null);
 
     public ChatMessageHandler(MessageRouter messageRouter) {
         this.messageRouter = messageRouter;
@@ -66,10 +71,11 @@ public class ChatMessageHandler extends SimpleChannelInboundHandler<String> {
             return;
         }
 
-        UUID senderId = UUID.fromString(session.getUserId());
+        UUID senderId = session.getUserId();
         UUID conversationId = UUID.fromString(matcher.group(1));
         String timestamp = matcher.group(2);
         String payload = matcher.group(3);
+
         Event event =
                 new Event(
                         senderId,
@@ -78,6 +84,27 @@ public class ChatMessageHandler extends SimpleChannelInboundHandler<String> {
                         EventType.MESSAGE_CREATED,
                         payload,
                         Instant.parse(timestamp));
-        messageRouter.route(event);
+
+        int currentInFlight = inFlightCount.incrementAndGet();
+        if (currentInFlight >= HIGH_WATERMARK) {
+            ChannelConfig config = ctx.channel().config();
+            if (config.isAutoRead()) {
+                config.setAutoRead(false);
+            }
+        }
+        lastRouteFuture =
+                lastRouteFuture
+                        .handle((_, _) -> null)
+                        .thenCompose(_ -> messageRouter.route(event))
+                        .whenComplete(
+                                (_, _) -> {
+                                    int remaining = inFlightCount.decrementAndGet();
+                                    if (remaining <= LOW_WATERMARK) {
+                                        ChannelConfig config = ctx.channel().config();
+                                        if (!config.isAutoRead()) {
+                                            config.setAutoRead(true);
+                                        }
+                                    }
+                                });
     }
 }

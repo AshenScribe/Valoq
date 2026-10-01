@@ -25,6 +25,7 @@ package server.handler;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import java.util.UUID;
 import server.MessageServer;
 import server.Session;
 import server.model.Event;
@@ -48,7 +49,7 @@ public class SyncHandler extends SimpleChannelInboundHandler<String> {
             return;
         }
 
-        String userId = session.getUserId();
+        UUID userId = session.getUserId();
         String eventId = msg.substring(5).trim();
 
         GetOutOfSyncEvents getOutOfSyncEvents = new GetOutOfSyncEvents(userId, eventId);

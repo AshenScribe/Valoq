@@ -25,8 +25,6 @@ package server;
 
 import config.ServerConfig;
 import database.CassandraManager;
-import database.ConversationMemberRepository;
-import database.EventRepository;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -44,17 +42,25 @@ import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.string.LineEncoder;
 import io.netty.handler.codec.string.LineSeparator;
 import io.netty.handler.codec.string.StringDecoder;
+import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.AttributeKey;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import server.handler.ConnectionLifecycleHandler;
 import server.handler.InitVerbHandler;
 import server.handler.SyncHandler;
 
 public class MessageServer {
 
+    public static final int MAX_FRAME_LENGTH = 10 * 1024 * 1024;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MessageServer.class);
+
     private final int port;
-    private Channel channel;
+    private Channel serverChannel;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
 
@@ -81,41 +87,44 @@ public class MessageServer {
                         .childOption(ChannelOption.SO_KEEPALIVE, true)
                         .childHandler(new MessageServerInitializer(connectionTracker));
 
-        channel = bootstrap.bind(port).sync().channel();
+        serverChannel = bootstrap.bind(port).sync().channel();
+        LOGGER.info("MessageServer started on port {}", getPort());
     }
 
     public synchronized void stop() {
-        if (channel != null) {
-            channel.close();
+        LOGGER.info("Initiating graceful shutdown for MessageServer...");
+        if (serverChannel != null && serverChannel.isOpen()) {
+            serverChannel.close().syncUninterruptibly();
+            LOGGER.info("Server port closed; no longer accepting new connections.");
         }
+
+        connectionTracker.broadcastNotice("DISCONNECT Server shutting down");
+        connectionTracker.closeAll();
         if (bossGroup != null) {
-            bossGroup.shutdownGracefully();
-            workerGroup.shutdownGracefully();
+            bossGroup.shutdownGracefully(100, 2000, TimeUnit.MILLISECONDS).syncUninterruptibly();
+            workerGroup.shutdownGracefully(100, 2000, TimeUnit.MILLISECONDS).syncUninterruptibly();
         }
         CassandraManager.close();
+        LOGGER.info("MessageServer stopped cleanly.");
     }
 
-    ConnectionTracker getConnectionTracker() {
+    public ConnectionTracker getConnectionTracker() {
         return connectionTracker;
     }
 
     public int getPort() {
-        return ((java.net.InetSocketAddress) channel.localAddress()).getPort();
+        return ((java.net.InetSocketAddress) serverChannel.localAddress()).getPort();
     }
 
     public static class MessageServerInitializer extends ChannelInitializer<Channel> {
 
-        public static final AttributeKey<Session> SESSION_KEY = AttributeKey.newInstance("session");
+        public static final AttributeKey<Session> SESSION_KEY = AttributeKey.valueOf("SESSION");
+
         private final ConnectionTracker connectionTracker;
         private final MessageRouter messageRouter;
 
         public MessageServerInitializer(ConnectionTracker connectionTracker) {
-            this(
-                    connectionTracker,
-                    new MessageRouter(
-                            connectionTracker,
-                            CassandraManager.isInitialized() ? new EventRepository() : null,
-                            new ConversationMemberRepository()));
+            this(connectionTracker, new MessageRouter(connectionTracker));
         }
 
         public MessageServerInitializer(
@@ -127,13 +136,16 @@ public class MessageServer {
         @Override
         protected void initChannel(Channel ch) {
             ch.attr(SESSION_KEY).set(new Session());
+            connectionTracker.track(ch);
+
             ch.pipeline()
                     .addLast(
                             "lineEncoder",
                             new LineEncoder(LineSeparator.UNIX, StandardCharsets.UTF_8));
-            ch.pipeline().addLast("lineBasedFrameDecoder", new LineBasedFrameDecoder(1024));
+            ch.pipeline().addLast("frameDecoder", new LineBasedFrameDecoder(MAX_FRAME_LENGTH));
             ch.pipeline().addLast("stringDecoder", new StringDecoder(StandardCharsets.UTF_8));
-            ch.pipeline().addLast("logger", new LoggingHandler());
+            ch.pipeline().addLast("logger", new LoggingHandler(LogLevel.DEBUG));
+
             ch.pipeline()
                     .addLast(
                             "initVerbHandler",

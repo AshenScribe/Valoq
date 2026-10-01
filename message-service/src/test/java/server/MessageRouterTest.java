@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import database.ConversationMemberRepository;
 import database.EventRepository;
+import database.UserEventRepository;
 import io.netty.channel.DefaultChannelId;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.time.Instant;
@@ -55,6 +56,7 @@ class MessageRouterTest {
     private ConnectionTracker connectionTracker;
     private EventRepository eventRepository;
     private ConversationMemberRepository memberRepository;
+    private UserEventRepository userEventRepository;
     private MessageRouter messageRouter;
 
     @BeforeEach
@@ -62,8 +64,10 @@ class MessageRouterTest {
         connectionTracker = new ConnectionTracker();
         eventRepository = mock(EventRepository.class);
         memberRepository = mock(ConversationMemberRepository.class);
-
-        messageRouter = new MessageRouter(connectionTracker, eventRepository, memberRepository);
+        userEventRepository = mock(UserEventRepository.class);
+        messageRouter =
+                new MessageRouter(
+                        connectionTracker, eventRepository, memberRepository, userEventRepository);
     }
 
     @Test
@@ -72,8 +76,8 @@ class MessageRouterTest {
 
         EmbeddedChannel bobChannel = new EmbeddedChannel(DefaultChannelId.newInstance());
 
-        connectionTracker.register(ALICE_ID.toString(), aliceChannel);
-        connectionTracker.register(BOB_ID.toString(), bobChannel);
+        connectionTracker.register(ALICE_ID, aliceChannel);
+        connectionTracker.register(BOB_ID, bobChannel);
 
         UUID eventId = UUID.fromString("550e8400-e29b-41d4-a716-446655440103");
 
@@ -87,7 +91,7 @@ class MessageRouterTest {
                         Instant.now());
 
         when(memberRepository.findMemberIds(CONVERSATION_ID))
-                .thenReturn(List.of(ALICE_ID.toString(), BOB_ID.toString()));
+                .thenReturn(CompletableFuture.completedFuture(List.of(ALICE_ID, BOB_ID)));
 
         when(eventRepository.saveEvent(
                         any(UUID.class),
@@ -115,7 +119,7 @@ class MessageRouterTest {
     void testRouteOfflineMemberDoesNotFail() {
         EmbeddedChannel aliceChannel = new EmbeddedChannel(DefaultChannelId.newInstance());
 
-        connectionTracker.register(ALICE_ID.toString(), aliceChannel);
+        connectionTracker.register(ALICE_ID, aliceChannel);
 
         UUID eventId = UUID.fromString("550e8400-e29b-41d4-a716-446655440105");
 
@@ -129,7 +133,7 @@ class MessageRouterTest {
                         Instant.now());
 
         when(memberRepository.findMemberIds(CONVERSATION_ID))
-                .thenReturn(List.of(ALICE_ID.toString(), BOB_ID.toString()));
+                .thenReturn(CompletableFuture.completedFuture(List.of(ALICE_ID, BOB_ID)));
 
         when(eventRepository.saveEvent(
                         any(UUID.class),
@@ -144,7 +148,7 @@ class MessageRouterTest {
 
         assertDoesNotThrow(() -> messageRouter.route(event).toCompletableFuture().join());
 
-        assertNull(connectionTracker.get(BOB_ID.toString()));
+        assertNull(connectionTracker.get(BOB_ID));
         assertNotNull(aliceChannel.readOutbound());
     }
 
@@ -152,7 +156,7 @@ class MessageRouterTest {
     void testRouteSelfMessage() {
         EmbeddedChannel aliceChannel = new EmbeddedChannel(DefaultChannelId.newInstance());
 
-        connectionTracker.register(ALICE_ID.toString(), aliceChannel);
+        connectionTracker.register(ALICE_ID, aliceChannel);
 
         UUID eventId = UUID.fromString("550e8400-e29b-41d4-a716-446655440107");
 
@@ -166,7 +170,7 @@ class MessageRouterTest {
                         Instant.now());
 
         when(memberRepository.findMemberIds(CONVERSATION_ID))
-                .thenReturn(List.of(ALICE_ID.toString()));
+                .thenReturn(CompletableFuture.completedFuture(List.of(ALICE_ID)));
 
         when(eventRepository.saveEvent(
                         any(UUID.class),

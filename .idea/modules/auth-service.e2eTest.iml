@@ -11,6 +11,8 @@
     <exclude-output />
     <content url="file://$MODULE_DIR$/../../auth-service/src/e2eTest">
       <sourceFolder url="file://$MODULE_DIR$/../../auth-service/src/e2eTest/java" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../auth-service/src/e2eTest/java" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../auth-service/src/e2eTest/resources" type="java-resource" />
       <sourceFolder url="file://$MODULE_DIR$/../../auth-service/src/e2eTest/resources" type="java-resource" />
     </content>
     <orderEntry type="jdk" jdkName="ms-25" jdkType="JavaSDK" />

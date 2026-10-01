@@ -27,6 +27,9 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Row;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.uuid.Uuids;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
@@ -45,12 +48,18 @@ public class EventRepository {
 
     public EventRepository(CqlSession session) {
         this.session = session;
-        this.insertStatement =
-                session.prepare(
-                        "INSERT INTO events (conversation_id, time_bucket, hash_bucket, event_id, event_type, actor_id, entity_id, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        this.selectStatement =
-                session.prepare(
-                        "SELECT * FROM events WHERE conversation_id = ? AND time_bucket = ? AND hash_bucket = ? AND event_id > ?");
+        SimpleStatement insertSimple =
+                SimpleStatement.newInstance(
+                                "INSERT INTO events (conversation_id, time_bucket, hash_bucket, event_id, event_type, actor_id, entity_id, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+                        .setIdempotent(true);
+
+        SimpleStatement selectSimple =
+                SimpleStatement.newInstance(
+                                "SELECT * FROM events WHERE conversation_id = ? AND time_bucket = ? AND hash_bucket = ? AND event_id > ?")
+                        .setIdempotent(true);
+
+        this.insertStatement = session.prepare(insertSimple);
+        this.selectStatement = session.prepare(selectSimple);
     }
 
     public CompletionStage<AsyncResultSet> saveEvent(
@@ -87,15 +96,17 @@ public class EventRepository {
                             if (row == null) {
                                 return Optional.empty();
                             }
-
+                            UUID extractedEventId = row.getUuid("event_id");
+                            Instant timestamp =
+                                    Instant.ofEpochMilli(Uuids.unixTimestamp(extractedEventId));
                             return Optional.of(
                                     new Event(
                                             row.getUuid("actor_id"),
                                             row.getUuid("conversation_id"),
-                                            row.getUuid("entity_id"),
+                                            extractedEventId,
                                             EventType.valueOf(row.getString("event_type")),
                                             row.getString("payload"),
-                                            row.getInstant("created_at")));
+                                            timestamp));
                         });
     }
 }

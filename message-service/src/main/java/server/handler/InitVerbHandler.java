@@ -24,11 +24,10 @@
 package server.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import database.ConversationMemberRepository;
-import database.EventRepository;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import jwt.JwtUtil;
@@ -45,12 +44,7 @@ public class InitVerbHandler extends SimpleChannelInboundHandler<String> {
     private final MessageRouter messageRouter;
 
     public InitVerbHandler(ConnectionTracker connectionTracker) {
-        this(
-                connectionTracker,
-                new MessageRouter(
-                        connectionTracker,
-                        new EventRepository(),
-                        new ConversationMemberRepository()));
+        this(connectionTracker, new MessageRouter(connectionTracker));
     }
 
     public InitVerbHandler(ConnectionTracker connectionTracker, MessageRouter messageRouter) {
@@ -66,15 +60,15 @@ public class InitVerbHandler extends SimpleChannelInboundHandler<String> {
             final Session session =
                     ctx.channel().attr(MessageServer.MessageServerInitializer.SESSION_KEY).get();
 
-            final String userId;
+            final UUID userId;
             try {
                 String token = matcher.group(2);
 
                 JsonNode payload = JwtUtil.getInstance().decodeToPayload(token);
                 if (payload.has("sub")) {
-                    userId = payload.get("sub").asText();
+                    userId = UUID.fromString(payload.get("sub").asText());
                 } else if (payload.has("userId")) {
-                    userId = payload.get("userId").asText();
+                    userId = UUID.fromString(payload.get("userId").asText());
                 } else {
                     throw new IllegalArgumentException(
                             "Missing subject/userId claim in JWT payload");

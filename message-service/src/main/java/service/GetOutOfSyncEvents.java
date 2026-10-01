@@ -39,13 +39,13 @@ import server.model.Event;
 
 public class GetOutOfSyncEvents implements Service<CompletionStage<List<Event>>> {
 
-    private final String userId;
+    private final UUID userId;
     private final String clientEventId;
     private final UserEventRepository userEventRepository;
     private final EventRepository eventRepository;
 
     public GetOutOfSyncEvents(
-            String userId,
+            UUID userId,
             String clientEventId,
             UserEventRepository userEventRepository,
             EventRepository eventRepository) {
@@ -55,15 +55,16 @@ public class GetOutOfSyncEvents implements Service<CompletionStage<List<Event>>>
         this.eventRepository = eventRepository;
     }
 
-    public GetOutOfSyncEvents(String userId, String clientEventId) {
+    public GetOutOfSyncEvents(UUID userId, String clientEventId) {
         this(userId, clientEventId, new UserEventRepository(), new EventRepository());
     }
 
     public CompletionStage<List<Event>> serve() {
         UUID cursor = UUID.fromString(clientEventId);
 
-        Instant cursorTime = Instant.ofEpochSecond(Uuids.unixTimestamp(cursor));
+        Instant cursorTime = Instant.ofEpochMilli(Uuids.unixTimestamp(cursor));
         String timeBucket = BucketUtils.toTimeBucket(cursorTime);
+
         return userEventRepository
                 .getUserEvents(userId, cursor, timeBucket)
                 .thenCompose(
@@ -73,16 +74,19 @@ public class GetOutOfSyncEvents implements Service<CompletionStage<List<Event>>>
                                 UUID eventId = row.getUuid("event_id");
                                 UUID conversationId = row.getUuid("conversation_id");
                                 Instant eventTime =
-                                        Instant.ofEpochSecond(Uuids.unixTimestamp(eventId));
+                                        Instant.ofEpochMilli(Uuids.unixTimestamp(eventId));
                                 String eventBucket = BucketUtils.toTimeBucket(eventTime);
+
                                 futures.add(
                                         eventRepository.getEvents(
                                                 conversationId, eventBucket, 0, eventId));
                             }
+
                             CompletableFuture<?>[] all =
                                     futures.stream()
                                             .map(CompletionStage::toCompletableFuture)
                                             .toArray(CompletableFuture[]::new);
+
                             return CompletableFuture.allOf(all)
                                     .thenApply(
                                             v ->

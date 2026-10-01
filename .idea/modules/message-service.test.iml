@@ -19,6 +19,7 @@
     <orderEntry type="library" name="Gradle: org.slf4j:slf4j-api:2.0.19" level="project" />
     <orderEntry type="library" name="Gradle: org.slf4j:slf4j-simple:2.0.19" level="project" />
     <orderEntry type="library" name="Gradle: org.aeonbits.owner:owner:1.0.12" level="project" />
+    <orderEntry type="library" name="Gradle: org.mockito:mockito-core:5.24.0" level="project" />
     <orderEntry type="library" name="Gradle: org.apache.cassandra:java-driver-core:4.19.3" level="project" />
     <orderEntry type="library" name="Gradle: com.fasterxml.jackson.core:jackson-databind:2.22.2" level="project" />
     <orderEntry type="library" name="Gradle: org.codehaus.groovy:groovy:3.0.5" level="project" />
@@ -32,6 +33,8 @@
     <orderEntry type="library" name="Gradle: io.netty:netty-codec-marshalling:4.2.18.Final" level="project" />
     <orderEntry type="library" name="Gradle: io.netty:netty-transport-native-unix-common:4.2.18.Final" level="project" />
     <orderEntry type="library" name="Gradle: io.netty:netty-transport-classes-epoll:4.2.18.Final" level="project" />
+    <orderEntry type="library" name="Gradle: net.bytebuddy:byte-buddy:1.17.7" level="project" />
+    <orderEntry type="library" name="Gradle: net.bytebuddy:byte-buddy-agent:1.17.7" level="project" />
     <orderEntry type="library" name="Gradle: com.datastax.oss:native-protocol:1.5.2" level="project" />
     <orderEntry type="library" name="Gradle: org.apache.cassandra:java-driver-guava-shaded:4.19.3" level="project" />
     <orderEntry type="library" name="Gradle: com.typesafe:config:1.4.1" level="project" />
@@ -56,6 +59,7 @@
     <orderEntry type="library" name="Gradle: com.github.jnr:jnr-a64asm:1.0.0" level="project" />
     <orderEntry type="library" name="Gradle: com.github.jnr:jnr-x86asm:1.0.2" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Gradle: org.junit.platform:junit-platform-launcher:1.7.1" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Gradle: org.objenesis:objenesis:3.3" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Gradle: com.github.jnr:jffi:native:1.3.9" level="project" />
   </component>
   <component name="TestModuleProperties" production-module="message-service.main" />

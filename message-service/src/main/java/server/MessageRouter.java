@@ -28,9 +28,11 @@ import com.datastax.oss.driver.api.core.uuid.Uuids;
 import database.BucketUtils;
 import database.ConversationMemberRepository;
 import database.EventRepository;
-import io.netty.channel.Channel;
+import database.UserEventRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import server.model.Event;
 
@@ -39,50 +41,78 @@ public class MessageRouter {
     private final ConnectionTracker connectionTracker;
     private final EventRepository eventRepository;
     private final ConversationMemberRepository memberRepository;
+    private final UserEventRepository userEventRepository;
+
+    public MessageRouter(ConnectionTracker connectionTracker) {
+        this(
+                connectionTracker,
+                new EventRepository(),
+                new ConversationMemberRepository(),
+                new UserEventRepository());
+    }
 
     public MessageRouter(
             ConnectionTracker connectionTracker,
             EventRepository eventRepository,
-            ConversationMemberRepository memberRepository) {
-
+            ConversationMemberRepository memberRepository,
+            UserEventRepository userEventRepository) {
         this.connectionTracker = connectionTracker;
         this.eventRepository = eventRepository;
         this.memberRepository = memberRepository;
+        this.userEventRepository = userEventRepository;
     }
 
     public CompletionStage<AsyncResultSet> route(Event event) {
         UUID eventId = Uuids.timeBased();
         String timeBucket = BucketUtils.toTimeBucket(event.createdAt());
-        List<String> members = memberRepository.findMemberIds(event.conversationId());
 
-        return eventRepository
-                .saveEvent(
-                        event.conversationId(),
-                        timeBucket,
-                        0,
-                        eventId,
-                        event.eventType().name(),
-                        event.senderId(),
-                        event.eventId(),
-                        event.payload())
-                .thenApply(
-                        result -> {
-                            for (String memberId : members) {
-                                Channel channel = connectionTracker.get(memberId);
-                                if (channel == null) {
-                                    continue;
-                                }
-                                channel.writeAndFlush(
-                                        String.format(
-                                                "EVENT %s %s %s %s %s",
-                                                event.eventType().name(),
-                                                eventId,
+        return memberRepository
+                .findMemberIds(event.conversationId())
+                .thenCompose(
+                        members ->
+                                eventRepository
+                                        .saveEvent(
                                                 event.conversationId(),
+                                                timeBucket,
+                                                0,
+                                                eventId,
+                                                event.eventType().name(),
                                                 event.senderId(),
-                                                event.payload()));
-                            }
+                                                event.eventId(),
+                                                event.payload())
+                                        .thenCompose(
+                                                result -> {
+                                                    String eventWireMessage =
+                                                            String.format(
+                                                                    "EVENT %s %s %s %s %s",
+                                                                    event.eventType().name(),
+                                                                    eventId,
+                                                                    event.conversationId(),
+                                                                    event.senderId(),
+                                                                    event.payload());
 
-                            return result;
-                        });
+                                                    connectionTracker.broadcastToUsers(
+                                                            members, eventWireMessage);
+
+                                                    List<CompletableFuture<?>> indexFutures =
+                                                            new ArrayList<>(members.size());
+                                                    for (UUID memberId : members) {
+                                                        indexFutures.add(
+                                                                userEventRepository
+                                                                        .saveUserEvent(
+                                                                                memberId,
+                                                                                timeBucket,
+                                                                                eventId,
+                                                                                event
+                                                                                        .conversationId())
+                                                                        .toCompletableFuture());
+                                                    }
+
+                                                    return CompletableFuture.allOf(
+                                                                    indexFutures.toArray(
+                                                                            new CompletableFuture
+                                                                                    [0]))
+                                                            .thenApply(v -> result);
+                                                }));
     }
 }
