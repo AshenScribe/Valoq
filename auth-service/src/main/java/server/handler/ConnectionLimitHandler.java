@@ -21,14 +21,17 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package server.command;
+package server.handler;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.group.ChannelGroup;
+import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
+import io.netty.util.concurrent.GlobalEventExecutor;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -40,7 +43,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Sharable handler placed at the head of the pipeline to limit concurrent connections globally and
- * per-IP.
+ * per-IP, and to track active channels for graceful server teardown.
  */
 @ChannelHandler.Sharable
 public final class ConnectionLimitHandler extends ChannelInboundHandlerAdapter {
@@ -55,12 +58,13 @@ public final class ConnectionLimitHandler extends ChannelInboundHandlerAdapter {
     private final AtomicLong globalCounter = new AtomicLong(0);
     private final ConcurrentMap<InetAddress, AtomicLong> perIpCounters = new ConcurrentHashMap<>();
 
+    private final ChannelGroup allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+
     public ConnectionLimitHandler(long globalMaxConnections, long maxConnectionsPerIp) {
         this.globalMaxConnections = globalMaxConnections;
         this.maxConnectionsPerIp = maxConnectionsPerIp;
     }
 
-    /** Default production settings: 5,000 global connections, 50 per IP. */
     public ConnectionLimitHandler() {
         this(5000, 50);
     }
@@ -98,6 +102,7 @@ public final class ConnectionLimitHandler extends ChannelInboundHandlerAdapter {
             }
         }
 
+        allChannels.add(ctx.channel());
         ctx.fireChannelActive();
     }
 
@@ -128,6 +133,10 @@ public final class ConnectionLimitHandler extends ChannelInboundHandlerAdapter {
             return address;
         }
         return null;
+    }
+
+    public void closeAllChannels() {
+        allChannels.close().awaitUninterruptibly();
     }
 
     public long getGlobalConnectionCount() {

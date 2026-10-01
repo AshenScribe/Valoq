@@ -97,19 +97,15 @@ public class CommandDecoder extends MessageToMessageDecoder<String> {
 
     private BasicCommand decodeBasic(String payload) {
         int firstColon = payload.indexOf(':');
-        if (firstColon == -1) {
-            throw new DecoderException(
-                    "Invalid BASIC payload. Expected format: username:password:salt");
-        }
-        int secondColon = payload.indexOf(':', firstColon + 1);
-        if (secondColon == -1) {
+        int lastColon = payload.lastIndexOf(':');
+        if (firstColon == -1 || lastColon == -1 || firstColon == lastColon) {
             throw new DecoderException(
                     "Invalid BASIC payload. Expected format: username:password:salt");
         }
 
         String username = payload.substring(0, firstColon);
-        String password = payload.substring(firstColon + 1, secondColon);
-        String salt = payload.substring(secondColon + 1);
+        String password = payload.substring(firstColon + 1, lastColon);
+        String salt = payload.substring(lastColon + 1);
 
         return new BasicCommand(username, password, salt);
     }

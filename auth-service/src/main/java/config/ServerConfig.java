@@ -70,8 +70,26 @@ public class ServerConfig {
         private String host = "localhost";
         private int port = 8001;
         private int maxFrameLength = 8192;
+        private int idleTimeoutSeconds = 60;
+        private long maxConnections = 5000;
+        private long maxConnectionsPerIp = 50;
         private ServerSslProps ssl = new ServerSslProps();
-        private int idleTimeoutSeconds = 60; // 0 disables idle timeout
+
+        public long getMaxConnections() {
+            return maxConnections;
+        }
+
+        public void setMaxConnections(long maxConnections) {
+            this.maxConnections = maxConnections;
+        }
+
+        public long getMaxConnectionsPerIp() {
+            return maxConnectionsPerIp;
+        }
+
+        public void setMaxConnectionsPerIp(long maxConnectionsPerIp) {
+            this.maxConnectionsPerIp = maxConnectionsPerIp;
+        }
 
         public int getIdleTimeoutSeconds() {
             return idleTimeoutSeconds;

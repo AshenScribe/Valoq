@@ -14,6 +14,7 @@
       <sourceFolder url="file://$MODULE_DIR$/../../message-service/src/main/resources" type="java-resource" />
       <sourceFolder url="file://$MODULE_DIR$/../../message-service/src/main/resources" type="java-resource" />
       <sourceFolder url="file://$MODULE_DIR$/../../message-service/src/main/resources" type="java-resource" />
+      <sourceFolder url="file://$MODULE_DIR$/../../message-service/src/main/resources" type="java-resource" />
     </content>
     <orderEntry type="jdk" jdkName="ms-25" jdkType="JavaSDK" />
     <orderEntry type="sourceFolder" forTests="false" />
