@@ -34,6 +34,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import protocol.Envelope;
+import protocol.Opcode;
+import server.model.Event;
 
 class MessageServerE2ETest extends BaseIntegrationTest {
 
@@ -60,39 +63,19 @@ class MessageServerE2ETest extends BaseIntegrationTest {
 
                 alice.sendMessage(CONVERSATION_ID, CREATED_AT, "SGVsbG8=");
 
-                String bobEvent = bob.readLine();
+                Event bobEvent = bob.readEvent();
+                assertMessageEvent(bobEvent, CONVERSATION_ID, ALICE_UUID, "SGVsbG8=");
 
-                Assertions.assertNotNull(bobEvent);
-                Assertions.assertTrue(bobEvent.startsWith("EVENT MESSAGE_CREATED "));
-                Assertions.assertTrue(bobEvent.contains(CONVERSATION_ID.toString()));
-                Assertions.assertTrue(bobEvent.contains(ALICE_UUID.toString()));
-                Assertions.assertTrue(bobEvent.endsWith("SGVsbG8="));
-
-                String aliceEvent = alice.readLine();
-
-                Assertions.assertNotNull(aliceEvent);
-                Assertions.assertTrue(aliceEvent.startsWith("EVENT MESSAGE_CREATED "));
-                Assertions.assertTrue(aliceEvent.contains(CONVERSATION_ID.toString()));
-                Assertions.assertTrue(aliceEvent.contains(ALICE_UUID.toString()));
-                Assertions.assertTrue(aliceEvent.endsWith("SGVsbG8="));
+                Event aliceEvent = alice.readEvent();
+                assertMessageEvent(aliceEvent, CONVERSATION_ID, ALICE_UUID, "SGVsbG8=");
 
                 bob.sendMessage(CONVERSATION_ID, CREATED_AT, "V29ybGQ=");
 
-                String aliceEvent2 = alice.readLine();
+                Event aliceEvent2 = alice.readEvent();
+                assertMessageEvent(aliceEvent2, CONVERSATION_ID, BOB_UUID, "V29ybGQ=");
 
-                Assertions.assertNotNull(aliceEvent2);
-                Assertions.assertTrue(aliceEvent2.startsWith("EVENT MESSAGE_CREATED "));
-                Assertions.assertTrue(aliceEvent2.contains(CONVERSATION_ID.toString()));
-                Assertions.assertTrue(aliceEvent2.contains(BOB_UUID.toString()));
-                Assertions.assertTrue(aliceEvent2.endsWith("V29ybGQ="));
-
-                String bobEvent2 = bob.readLine();
-
-                Assertions.assertNotNull(bobEvent2);
-                Assertions.assertTrue(bobEvent2.startsWith("EVENT MESSAGE_CREATED "));
-                Assertions.assertTrue(bobEvent2.contains(CONVERSATION_ID.toString()));
-                Assertions.assertTrue(bobEvent2.contains(BOB_UUID.toString()));
-                Assertions.assertTrue(bobEvent2.endsWith("V29ybGQ="));
+                Event bobEvent2 = bob.readEvent();
+                assertMessageEvent(bobEvent2, CONVERSATION_ID, BOB_UUID, "V29ybGQ=");
 
                 Row row =
                         awaitRow(
@@ -125,16 +108,8 @@ class MessageServerE2ETest extends BaseIntegrationTest {
 
                 alice.sendMessage(CONVERSATION_ID, CREATED_AT, "SGVsbG8=");
 
-                /*
-                 * Sender is online, so it receives its own event.
-                 */
-                String event = alice.readLine();
-
-                Assertions.assertNotNull(event);
-                Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
-                Assertions.assertTrue(event.contains(CONVERSATION_ID.toString()));
-                Assertions.assertTrue(event.contains(ALICE_UUID.toString()));
-                Assertions.assertTrue(event.endsWith("SGVsbG8="));
+                Event event = alice.readEvent();
+                assertMessageEvent(event, CONVERSATION_ID, ALICE_UUID, "SGVsbG8=");
 
                 Row row =
                         awaitRow(
@@ -177,16 +152,11 @@ class MessageServerE2ETest extends BaseIntegrationTest {
 
                 alice.sendMessage(CONVERSATION_ID, CREATED_AT, "SGVsbG8gQm9i");
 
-                String bobEvent = bob.readLine();
-
-                Assertions.assertNotNull(bobEvent);
-                Assertions.assertTrue(bobEvent.startsWith("EVENT MESSAGE_CREATED "));
-                Assertions.assertTrue(bobEvent.contains(CONVERSATION_ID.toString()));
-                Assertions.assertTrue(bobEvent.contains(ALICE_UUID.toString()));
-                Assertions.assertTrue(bobEvent.endsWith("SGVsbG8gQm9i"));
+                Event bobEvent = bob.readEvent();
+                assertMessageEvent(bobEvent, CONVERSATION_ID, ALICE_UUID, "SGVsbG8gQm9i");
 
                 Assertions.assertNull(
-                        charlie.readLine(Duration.ofMillis(200)),
+                        charlie.readEvent(Duration.ofMillis(200)),
                         "Charlie is not a member of the conversation");
             }
         }
@@ -202,13 +172,8 @@ class MessageServerE2ETest extends BaseIntegrationTest {
 
                 alice.sendMessage(CONVERSATION_ID, CREATED_AT, "U2VsZi1tZXNzYWdl");
 
-                String event = alice.readLine();
-
-                Assertions.assertNotNull(event);
-                Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
-                Assertions.assertTrue(event.contains(CONVERSATION_ID.toString()));
-                Assertions.assertTrue(event.contains(ALICE_UUID.toString()));
-                Assertions.assertTrue(event.endsWith("U2VsZi1tZXNzYWdl"));
+                Event event = alice.readEvent();
+                assertMessageEvent(event, CONVERSATION_ID, ALICE_UUID, "U2VsZi1tZXNzYWdl");
             }
         }
     }
@@ -222,9 +187,17 @@ class MessageServerE2ETest extends BaseIntegrationTest {
         void invalidInitClosesSocket() throws Exception {
             try (MessageTestClient client = connect()) {
 
-                client.send("init bad_format");
+                client.sendInvalidInit("bad_format");
 
-                Assertions.assertEquals("INVALID", client.readLine());
+                Envelope response = client.readEnvelope();
+                Assertions.assertNotNull(response);
+                try {
+                    Assertions.assertEquals(Opcode.ERROR, response.getHeader().opcode());
+                    Assertions.assertEquals(
+                            "INVALID", protocol.BufferUtil.readString(response.getBody()));
+                } finally {
+                    response.release();
+                }
 
                 Assertions.assertTrue(client.isClosedByServer());
             }
@@ -242,18 +215,23 @@ class MessageServerE2ETest extends BaseIntegrationTest {
                 alice.init(ALICE_UUID);
                 bob.init(BOB_UUID);
 
-                alice.send("SEND bob");
+                alice.sendMalformedSend();
 
-                Assertions.assertEquals("ERROR Invalid SEND format", alice.readLine());
+                Envelope response = alice.readEnvelope();
+                Assertions.assertNotNull(response);
+                try {
+                    Assertions.assertEquals(Opcode.ERROR, response.getHeader().opcode());
+                    Assertions.assertEquals(
+                            "ERROR Invalid SEND format",
+                            protocol.BufferUtil.readString(response.getBody()));
+                } finally {
+                    response.release();
+                }
 
                 alice.sendMessage(CONVERSATION_ID, CREATED_AT, "U3RpbGwgYWxpdmU=");
 
-                String event = bob.readLine();
-
-                Assertions.assertNotNull(event);
-                Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
-                Assertions.assertTrue(event.contains(ALICE_UUID.toString()));
-                Assertions.assertTrue(event.endsWith("U3RpbGwgYWxpdmU="));
+                Event event = bob.readEvent();
+                assertMessageEvent(event, CONVERSATION_ID, ALICE_UUID, "U3RpbGwgYWxpdmU=");
             }
         }
     }
@@ -280,12 +258,8 @@ class MessageServerE2ETest extends BaseIntegrationTest {
                 }
 
                 for (int i = 0; i < burstCount; i++) {
-                    String event = bob.readLine();
-
-                    Assertions.assertNotNull(event);
-                    Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
-                    Assertions.assertTrue(event.contains(CONVERSATION_ID.toString()));
-                    Assertions.assertTrue(event.endsWith("bXNnX" + i));
+                    Event event = bob.readEvent();
+                    assertMessageEvent(event, CONVERSATION_ID, ALICE_UUID, "bXNnX" + i);
                 }
             }
         }
@@ -299,33 +273,30 @@ class MessageServerE2ETest extends BaseIntegrationTest {
                     MessageTestClient bob = connect()) {
 
                 bob.init(BOB_UUID);
+                alice.writeInit(ALICE_UUID);
+                alice.writeSendMessage(CONVERSATION_ID, CREATED_AT, "UGlwcGVsaW5lZA==");
+                alice.flush();
 
-                String aliceToken = alice.createToken(ALICE_UUID);
+                Envelope ready = alice.readEnvelope();
+                Assertions.assertNotNull(ready);
+                try {
+                    Assertions.assertEquals(Opcode.READY, ready.getHeader().opcode());
+                } finally {
+                    ready.release();
+                }
 
-                String pipelined =
-                        "INIT "
-                                + aliceToken
-                                + "\n"
-                                + "SEND "
-                                + CONVERSATION_ID
-                                + " "
-                                + CREATED_AT
-                                + " "
-                                + "UGlwcGVsaW5lZA=="
-                                + "\n";
-
-                alice.send(pipelined);
-
-                Assertions.assertEquals("SUCCESS", alice.readLine());
-
-                String event = bob.readLine();
-
-                Assertions.assertNotNull(event);
-                Assertions.assertTrue(event.startsWith("EVENT MESSAGE_CREATED "));
-                Assertions.assertTrue(event.contains(CONVERSATION_ID.toString()));
-                Assertions.assertTrue(event.contains(ALICE_UUID.toString()));
-                Assertions.assertTrue(event.endsWith("UGlwcGVsaW5lZA=="));
+                Event event = bob.readEvent();
+                assertMessageEvent(event, CONVERSATION_ID, ALICE_UUID, "UGlwcGVsaW5lZA==");
             }
         }
+    }
+
+    private static void assertMessageEvent(
+            Event event, UUID conversationId, UUID senderId, String payload) {
+        Assertions.assertNotNull(event);
+        Assertions.assertEquals(conversationId, event.conversationId());
+        Assertions.assertEquals(senderId, event.senderId());
+        Assertions.assertEquals("MESSAGE_CREATED", event.eventType().name());
+        Assertions.assertEquals(payload, event.payload());
     }
 }

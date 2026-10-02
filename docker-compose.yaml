@@ -29,73 +29,29 @@ services:
     environment:
       CASSANDRA_CLUSTER_NAME: "ValoqCluster"
       CASSANDRA_DC: "datacenter1"
-      SSL_VALIDATE: "false"
-      MAX_HEAP_SIZE: "1024M"
     volumes:
-      - ./message-service/src/main/resources/init.cql:/init.cql:ro
-    command:
-      - /bin/sh
-      - -c
-      - |
-        sed -i 's/^authenticator: .*/authenticator: PasswordAuthenticator/' /etc/cassandra/cassandra.yaml
-        sed -i 's/^authorizer: .*/authorizer: CassandraAuthorizer/' /etc/cassandra/cassandra.yaml
-
-        rm -f /etc/cassandra/keystore.p12
-        keytool -genkeypair -alias cassandra -keyalg RSA -keysize 2048 \
-          -keystore /etc/cassandra/keystore.p12 -storetype PKCS12 \
-          -storepass cassandra -keypass cassandra -dname "CN=localhost" -noprompt
-
-        python3 -c '
-        path = "/etc/cassandra/cassandra.yaml"
-        with open(path, "r") as f:
-            lines = f.readlines()
-
-        new_lines = []
-        skip = False
-        for line in lines:
-            if line.startswith("client_encryption_options:"):
-                skip = True
-                continue
-            if skip and (line.startswith("  ") or line.strip() == ""):
-                continue
-            skip = False
-            new_lines.append(line)
-
-        ssl_block = (
-            "client_encryption_options:\n"
-            "  enabled: true\n"
-            "  optional: false\n"
-            "  keystore: /etc/cassandra/keystore.p12\n"
-            "  keystore_password: cassandra\n"
-            "  require_client_auth: false\n"
-        )
-        new_lines.append("\n" + ssl_block)
-
-        with open(path, "w") as f:
-            f.writelines(new_lines)
-        '
-
-        mkdir -p /root/.cassandra
-        printf "[ssl]\nvalidate = false\n" > /root/.cassandra/cqlshrc
-
-        # FIX: Background job to execute init.cql once Cassandra is fully ready
-        (
-          echo "Waiting for Cassandra to accept connections..."
-          until cqlsh -u cassandra -p cassandra --ssl -e "describe cluster" > /dev/null 2>&1; do
-            sleep 5
-          done
-          echo "Cassandra is up. Executing init.cql..."
-          cqlsh -u cassandra -p cassandra --ssl -f /init.cql
-          echo "Database initialization complete."
-        ) &
-
-        exec docker-entrypoint.sh cassandra -f
+      - ./script/cassandra.yaml:/etc/cassandra/cassandra.yaml
     healthcheck:
-      test: ["CMD-SHELL", "cqlsh -u cassandra -p cassandra --ssl -e 'DESCRIBE KEYSPACE system.local' || exit 1"]
+      test: ["CMD-SHELL", "nodetool status | grep -q 'UN'"]
       interval: 10s
       timeout: 5s
-      retries: 15
-      start_period: 45s
+      retries: 10
+      start_period: 60s
+
+  cassandra-init:
+    image: cassandra:5.0
+    container_name: valoq-cassandra-init
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    volumes:
+      - ./script/init.cql:/init.cql:ro
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      "cqlsh cassandra 9042
+      -u cassandra
+      -p cassandra
+      -f /init.cql"
 
   auth-service:
     build:
@@ -126,16 +82,18 @@ services:
     environment:
       DB_HOST: cassandra
       DB_PORT: 9042
-      DB_KEYSPACE: valoq_keyspace
+      DB_KEYSPACE: valoq_messages
       DB_LOCAL_DATACENTER: datacenter1
-      DB_USER: cassandra
-      DB_PASSWORD: cassandra
+      DB_USER: valoq_message_service
+      DB_PASSWORD: message_service_password
       PORT: 8082
+      DB_SSL_ENABLED: false
       AUTH_HOST: auth-service
       AUTH_PORT: 8081
     restart: on-failure
     depends_on:
-      cassandra:
-        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+
       auth-service:
         condition: service_started

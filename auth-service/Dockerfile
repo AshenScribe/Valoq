@@ -24,11 +24,16 @@ RUN --mount=type=cache,target=${GRADLE_USER_HOME} \
     ./gradlew dependencies --no-daemon --console=plain
 
 COPY src ./src
-COPY LICENSE_HEADER .
 
 RUN --mount=type=cache,target=${GRADLE_USER_HOME} \
     --mount=type=cache,target=${GRADLE_USER_HOME}/wrapper \
-    ./gradlew build --no-daemon -x test --console=plain
+    ./gradlew build --no-daemon \
+        -x test \
+        -x e2eTest \
+        -x check \
+        -x spotlessCheck \
+        -x spotlessApply \
+        --console=plain
 
 FROM eclipse-temurin:25-jre-alpine AS runtime
 

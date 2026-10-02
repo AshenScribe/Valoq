@@ -24,9 +24,9 @@
 package server;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -44,6 +44,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import protocol.BinaryMessages;
+import protocol.Envelope;
+import protocol.Opcode;
 import server.model.Event;
 import server.model.EventType;
 
@@ -73,7 +76,6 @@ class MessageRouterTest {
     @Test
     void testRouteSuccess() {
         EmbeddedChannel aliceChannel = new EmbeddedChannel(DefaultChannelId.newInstance());
-
         EmbeddedChannel bobChannel = new EmbeddedChannel(DefaultChannelId.newInstance());
 
         connectionTracker.register(ALICE_ID, aliceChannel);
@@ -106,13 +108,18 @@ class MessageRouterTest {
 
         messageRouter.route(event).toCompletableFuture().join();
 
-        String message = bobChannel.readOutbound();
-
-        assertNotNull(message);
-        assertTrue(message.startsWith("EVENT MESSAGE_CREATED "));
-        assertTrue(message.contains(CONVERSATION_ID.toString()));
-        assertTrue(message.contains(ALICE_ID.toString()));
-        assertTrue(message.endsWith("SGVsbG8="));
+        Envelope envelope = bobChannel.readOutbound();
+        assertNotNull(envelope);
+        try {
+            assertEquals(Opcode.EVENT, envelope.getHeader().opcode());
+            Event decoded = BinaryMessages.decodeEvent(envelope.getBody());
+            assertEquals(EventType.MESSAGE_CREATED, decoded.eventType());
+            assertEquals(CONVERSATION_ID, decoded.conversationId());
+            assertEquals(ALICE_ID, decoded.senderId());
+            assertEquals("SGVsbG8=", decoded.payload());
+        } finally {
+            envelope.release();
+        }
     }
 
     @Test
@@ -149,7 +156,9 @@ class MessageRouterTest {
         assertDoesNotThrow(() -> messageRouter.route(event).toCompletableFuture().join());
 
         assertNull(connectionTracker.get(BOB_ID));
-        assertNotNull(aliceChannel.readOutbound());
+        Envelope envelope = aliceChannel.readOutbound();
+        assertNotNull(envelope);
+        envelope.release();
     }
 
     @Test
@@ -185,12 +194,17 @@ class MessageRouterTest {
 
         messageRouter.route(event).toCompletableFuture().join();
 
-        String message = aliceChannel.readOutbound();
-
-        assertNotNull(message);
-        assertTrue(message.startsWith("EVENT MESSAGE_CREATED "));
-        assertTrue(message.contains(CONVERSATION_ID.toString()));
-        assertTrue(message.contains(ALICE_ID.toString()));
-        assertTrue(message.endsWith("U2VsZi1tZXNzYWdl"));
+        Envelope envelope = aliceChannel.readOutbound();
+        assertNotNull(envelope);
+        try {
+            assertEquals(Opcode.EVENT, envelope.getHeader().opcode());
+            Event decoded = BinaryMessages.decodeEvent(envelope.getBody());
+            assertEquals(EventType.MESSAGE_CREATED, decoded.eventType());
+            assertEquals(CONVERSATION_ID, decoded.conversationId());
+            assertEquals(ALICE_ID, decoded.senderId());
+            assertEquals("U2VsZi1tZXNzYWdl", decoded.payload());
+        } finally {
+            envelope.release();
+        }
     }
 }

@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import protocol.BinaryMessages;
+import protocol.Envelope;
 import server.model.Event;
 
 public class MessageRouter {
@@ -82,17 +84,25 @@ public class MessageRouter {
                                                 event.payload())
                                         .thenCompose(
                                                 result -> {
-                                                    String eventWireMessage =
-                                                            String.format(
-                                                                    "EVENT %s %s %s %s %s",
-                                                                    event.eventType().name(),
-                                                                    eventId,
-                                                                    event.conversationId(),
+                                                    Event persistedEvent =
+                                                            new Event(
                                                                     event.senderId(),
-                                                                    event.payload());
+                                                                    event.conversationId(),
+                                                                    eventId,
+                                                                    event.eventType(),
+                                                                    event.payload(),
+                                                                    event.createdAt());
+
+                                                    Envelope eventEnvelope =
+                                                            BinaryMessages.createEventEnvelope(
+                                                                    persistedEvent,
+                                                                    Envelope.EVENT_STREAM_ID,
+                                                                    io.netty.buffer
+                                                                            .PooledByteBufAllocator
+                                                                            .DEFAULT);
 
                                                     connectionTracker.broadcastToUsers(
-                                                            members, eventWireMessage);
+                                                            members, eventEnvelope);
 
                                                     List<CompletableFuture<?>> indexFutures =
                                                             new ArrayList<>(members.size());

@@ -26,41 +26,36 @@ package server.handler;
 import com.fasterxml.jackson.databind.JsonNode;
 import database.EventRepository;
 import database.UserEventRepository;
+import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.atomic.AtomicInteger;
 import jwt.JwtUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import protocol.BinaryMessages;
+import protocol.Envelope;
+import protocol.Opcode;
 import server.ClientConnection;
 import server.ConnectionTracker;
 import server.MessageRouter;
 import server.model.Event;
 import server.model.EventType;
-import server.util.RateLimitedLogger;
 import service.GetOutOfSyncEvents;
 
-public class CommandDispatcherHandler extends SimpleChannelInboundHandler<String> {
+public class CommandDispatcherHandler extends SimpleChannelInboundHandler<Envelope> {
 
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(CommandDispatcherHandler.class);
-    private static final RateLimitedLogger RATE_LIMITED_LOGGER = RateLimitedLogger.getLogger(LOGGER, 5, TimeUnit.SECONDS);
-
-    private static final Pattern SEND_PATTERN =
-            Pattern.compile("^SEND\\s+([^\\s]+)\\s+([^\\s]+)\\s+([^\\s]+)$");
-    private static final Pattern INIT_PATTERN = Pattern.compile("^INIT\\s+(.+)$");
-    private CompletableFuture<?> lastRouteFuture = CompletableFuture.completedFuture(null);
+    private static final int HIGH_WATERMARK = 64;
+    private static final int LOW_WATERMARK = 32;
 
     private final ConnectionTracker connectionTracker;
     private final MessageRouter messageRouter;
     private final UserEventRepository userEventRepository;
     private final EventRepository eventRepository;
+
+    private final AtomicInteger inFlightCount = new AtomicInteger(0);
+    private CompletableFuture<?> lastRouteFuture = CompletableFuture.completedFuture(null);
 
     public CommandDispatcherHandler(
             ConnectionTracker connectionTracker, MessageRouter messageRouter) {
@@ -71,40 +66,33 @@ public class CommandDispatcherHandler extends SimpleChannelInboundHandler<String
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, String rawMsg) {
-        String msg = rawMsg.trim();
-        if (msg.isEmpty()) {
-            RATE_LIMITED_LOGGER.warn("empty_cmd", "Received empty command from {}", ctx.channel().remoteAddress());
-            ctx.writeAndFlush("INVALID").addListener(ChannelFutureListener.CLOSE);
-            return;
-        }
-
+    protected void channelRead0(ChannelHandlerContext ctx, Envelope envelope) {
         ClientConnection conn = ClientConnection.get(ctx.channel());
         if (conn == null) {
             conn = connectionTracker.track(ctx.channel());
         }
 
-        if (msg.startsWith("INIT")) {
-            handleInit(ctx, conn, msg);
-        } else if (msg.startsWith("SEND")) {
-            handleSend(ctx, conn, msg);
-        } else if (msg.startsWith("SYNC")) {
-            handleSync(ctx, conn, msg);
-        } else {
-            ctx.writeAndFlush("INVALID").addListener(ChannelFutureListener.CLOSE);
+        int streamId = envelope.getHeader().streamId();
+        Opcode opcode = envelope.getHeader().opcode();
+
+        switch (opcode) {
+            case INIT -> handleInit(ctx, conn, envelope, streamId);
+            case SEND -> handleSend(ctx, conn, envelope, streamId);
+            case SYNC -> handleSync(ctx, conn, envelope, streamId);
+            default -> {
+                Envelope err =
+                        BinaryMessages.createErrorResponse(
+                                streamId, "Unexpected opcode: " + opcode, ctx.alloc());
+                ctx.writeAndFlush(err).addListener(ChannelFutureListener.CLOSE);
+            }
         }
     }
 
-    private void handleInit(ChannelHandlerContext ctx, ClientConnection conn, String msg) {
-        Matcher matcher = INIT_PATTERN.matcher(msg);
-        if (!matcher.matches()) {
-            ctx.writeAndFlush("INVALID").addListener(ChannelFutureListener.CLOSE);
-            return;
-        }
-
+    private void handleInit(
+            ChannelHandlerContext ctx, ClientConnection conn, Envelope env, int streamId) {
         try {
-            String token = matcher.group(1).trim();
-            JsonNode payload = JwtUtil.getInstance().decodeToPayload(token);
+            BinaryMessages.InitRequest req = BinaryMessages.InitRequest.decode(env.getBody());
+            JsonNode payload = JwtUtil.getInstance().decodeToPayload(req.token());
 
             String rawUserId = null;
             if (payload.has("sub")) {
@@ -114,99 +102,138 @@ public class CommandDispatcherHandler extends SimpleChannelInboundHandler<String
             }
 
             if (rawUserId == null) {
-                ctx.writeAndFlush("INVALID").addListener(ChannelFutureListener.CLOSE);
+                Envelope err =
+                        BinaryMessages.createErrorResponse(
+                                streamId, "Missing userId claim", ctx.alloc());
+                ctx.writeAndFlush(err).addListener(ChannelFutureListener.CLOSE);
                 return;
             }
 
             UUID userId = UUID.fromString(rawUserId);
-
-            // Register into connectionTracker and mark ClientConnection as authenticated
             connectionTracker.register(userId, ctx.channel());
-            ctx.writeAndFlush("SUCCESS");
+            conn.authenticate(userId);
+
+            // Send READY response stamped with client's streamId
+            ctx.writeAndFlush(BinaryMessages.createReadyResponse(streamId));
 
         } catch (Exception e) {
-            ctx.writeAndFlush("INVALID").addListener(ChannelFutureListener.CLOSE);
+            Envelope err = BinaryMessages.createErrorResponse(streamId, "INVALID", ctx.alloc());
+            ctx.writeAndFlush(err).addListener(ChannelFutureListener.CLOSE);
+        } finally {
+            env.release();
         }
     }
 
-    private void handleSend(ChannelHandlerContext ctx, ClientConnection conn, String msg) {
+    private void handleSend(
+            ChannelHandlerContext ctx, ClientConnection conn, Envelope env, int streamId) {
         if (!conn.isAuthenticated()) {
-            ctx.writeAndFlush("ERROR Session not initialized");
-            return;
-        }
-
-        Matcher matcher = SEND_PATTERN.matcher(msg);
-        if (!matcher.matches()) {
-            ctx.writeAndFlush("ERROR Invalid SEND format");
+            Envelope err =
+                    BinaryMessages.createErrorResponse(
+                            streamId, "ERROR Session not initialized", ctx.alloc());
+            ctx.writeAndFlush(err);
+            env.release();
             return;
         }
 
         try {
-            UUID conversationId = UUID.fromString(matcher.group(1));
-            Instant timestamp = Instant.parse(matcher.group(2));
-            String payload = matcher.group(3);
+            BinaryMessages.SendRequest req = BinaryMessages.SendRequest.decode(env.getBody());
 
             Event event =
                     new Event(
                             conn.getUserId(),
-                            conversationId,
+                            req.conversationId(),
                             UUID.randomUUID(),
                             EventType.MESSAGE_CREATED,
-                            payload,
-                            timestamp);
+                            req.payload(),
+                            req.timestamp());
+
+            int currentInFlight = inFlightCount.incrementAndGet();
+            if (currentInFlight >= HIGH_WATERMARK) {
+                ChannelConfig config = ctx.channel().config();
+                if (config.isAutoRead()) {
+                    config.setAutoRead(false);
+                }
+            }
+
             lastRouteFuture =
                     lastRouteFuture
-                            .handle((_, _) -> null)
-                            .thenCompose(v -> messageRouter.route(event));
+                            .handle((res, ex) -> null)
+                            .thenCompose(v -> messageRouter.route(event))
+                            .whenComplete(
+                                    (res, ex) -> {
+                                        int remaining = inFlightCount.decrementAndGet();
+                                        if (remaining <= LOW_WATERMARK) {
+                                            ChannelConfig config = ctx.channel().config();
+                                            if (!config.isAutoRead()) {
+                                                config.setAutoRead(true);
+                                            }
+                                        }
+                                    });
 
         } catch (Exception e) {
-            ctx.writeAndFlush("ERROR Invalid SEND format");
+            Envelope err =
+                    BinaryMessages.createErrorResponse(
+                            streamId, "ERROR Invalid SEND format", ctx.alloc());
+            ctx.writeAndFlush(err);
+        } finally {
+            env.release();
         }
     }
 
-    private void handleSync(ChannelHandlerContext ctx, ClientConnection conn, String msg) {
+    private void handleSync(
+            ChannelHandlerContext ctx, ClientConnection conn, Envelope env, int streamId) {
         if (!conn.isAuthenticated()) {
-            ctx.writeAndFlush("ERROR: Session not initialized\n");
+            Envelope err =
+                    BinaryMessages.createErrorResponse(
+                            streamId, "ERROR Session not initialized", ctx.alloc());
+            ctx.writeAndFlush(err);
+            env.release();
             return;
         }
 
-        String eventIdParam = msg.substring(4).trim();
-        if (eventIdParam.isEmpty()) {
-            ctx.writeAndFlush("ERROR: SYNC failed\n");
-            return;
+        try {
+            BinaryMessages.SyncRequest req = BinaryMessages.SyncRequest.decode(env.getBody());
+
+            GetOutOfSyncEvents getOutOfSyncEvents =
+                    new GetOutOfSyncEvents(
+                            conn.getUserId(),
+                            req.cursorEventId().toString(),
+                            userEventRepository,
+                            eventRepository);
+
+            getOutOfSyncEvents
+                    .serve()
+                    .thenAccept(
+                            events -> {
+                                for (Event event : events) {
+                                    Envelope eventEnv =
+                                            BinaryMessages.createEventEnvelope(
+                                                    event, streamId, ctx.alloc());
+                                    ctx.write(eventEnv);
+                                }
+                                ctx.flush();
+                            })
+                    .exceptionally(
+                            error -> {
+                                Envelope err =
+                                        BinaryMessages.createErrorResponse(
+                                                streamId, "ERROR SYNC failed", ctx.alloc());
+                                ctx.writeAndFlush(err);
+                                return null;
+                            });
+
+        } catch (Exception e) {
+            Envelope err =
+                    BinaryMessages.createErrorResponse(
+                            streamId, "ERROR Invalid SYNC format", ctx.alloc());
+            ctx.writeAndFlush(err);
+        } finally {
+            env.release();
         }
-
-        GetOutOfSyncEvents getOutOfSyncEvents =
-                new GetOutOfSyncEvents(
-                        conn.getUserId(), eventIdParam, userEventRepository, eventRepository);
-
-        getOutOfSyncEvents
-                .serve()
-                .thenAccept(
-                        events -> {
-                            for (Event event : events) {
-                                String response =
-                                        String.format(
-                                                "EVENT %s %s %s %s %s\n",
-                                                event.eventType().name(),
-                                                event.eventId(),
-                                                event.conversationId(),
-                                                event.senderId(),
-                                                event.payload());
-                                ctx.write(response);
-                            }
-                            ctx.flush();
-                        })
-                .exceptionally(
-                        error -> {
-                            ctx.writeAndFlush("ERROR: SYNC failed\n");
-                            return null;
-                        });
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        RATE_LIMITED_LOGGER.warn("exception_caught", "Exception caught in CommandDispatcherHandler: {}", cause.getMessage());
         ctx.close();
     }
 }

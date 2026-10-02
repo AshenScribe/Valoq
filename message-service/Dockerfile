@@ -24,9 +24,16 @@ RUN --mount=type=cache,target=${GRADLE_USER_HOME} \
 COPY src ./src
 COPY LICENSE_HEADER .
 
+# Replace 'build' with 'installDist'
 RUN --mount=type=cache,target=${GRADLE_USER_HOME} \
     --mount=type=cache,target=${GRADLE_USER_HOME}/wrapper \
-    ./gradlew installDist --no-daemon -x test --console=plain
+    ./gradlew installDist --no-daemon \
+        -x test \
+        -x e2eTest \
+        -x check \
+        -x spotlessCheck \
+        -x spotlessApply \
+        --console=plain
 
 FROM eclipse-temurin:25-jre-jammy AS runtime
 

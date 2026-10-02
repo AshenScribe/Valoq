@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import protocol.BinaryMessages;
+import protocol.Envelope;
 
 public class ConnectionTracker {
 
@@ -194,10 +196,71 @@ public class ConnectionTracker {
         return userChannels.size();
     }
 
-    /** Broadcasts a notice to all connected channels (e.g. during server shutdown). */
+    /**
+     * Broadcasts an Envelope across all recipient channels. Each channel receives a retained slice
+     * so one channel's encoder releasing the buffer does not deallocate it for other channels.
+     */
+    public int broadcastToUsers(Collection<UUID> userIds, Envelope envelope) {
+        List<Channel> channelsToFlush = new ArrayList<>();
+
+        try {
+            for (UUID userId : userIds) {
+                Set<Channel> channels = userChannels.get(userId);
+                if (channels != null) {
+                    for (Channel ch : channels) {
+                        if (ch.isActive()) {
+                            // Retain buffer reference for this channel
+                            ch.write(envelope.duplicate());
+                            channelsToFlush.add(ch);
+                        }
+                    }
+                }
+            }
+
+            for (Channel ch : channelsToFlush) {
+                ch.flush();
+            }
+        } finally {
+            // Release the original envelope
+            envelope.release();
+        }
+
+        return channelsToFlush.size();
+    }
+
+    public int sendToUser(UUID userId, Envelope envelope) {
+        Set<Channel> channels = userChannels.get(userId);
+        if (channels == null || channels.isEmpty()) {
+            envelope.release();
+            return 0;
+        }
+
+        int delivered = 0;
+        try {
+            for (Channel ch : channels) {
+                if (ch.isActive()) {
+                    ch.writeAndFlush(envelope.duplicate());
+                    delivered++;
+                }
+            }
+        } finally {
+            envelope.release();
+        }
+        return delivered;
+    }
+
     public void broadcastNotice(String noticeMessage) {
+        // Send error/notice envelope on shutdown
         if (!allChannels.isEmpty()) {
-            allChannels.writeAndFlush(noticeMessage);
+            for (Channel ch : allChannels) {
+                if (ch.isActive()) {
+                    Envelope notice =
+                            BinaryMessages.createErrorResponse(
+                                    Envelope.EVENT_STREAM_ID, noticeMessage, ch.alloc());
+                    ch.write(notice);
+                }
+            }
+            allChannels.flush();
         }
     }
 }

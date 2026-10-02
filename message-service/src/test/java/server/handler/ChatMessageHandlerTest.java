@@ -45,10 +45,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import protocol.BinaryMessages;
+import protocol.Envelope;
+import protocol.Opcode;
 import server.ConnectionTracker;
 import server.MessageRouter;
 import server.MessageServer;
 import server.Session;
+import server.model.Event;
+import server.model.EventType;
 
 class ChatMessageHandlerTest {
 
@@ -72,6 +77,7 @@ class ChatMessageHandlerTest {
         eventRepository = mock(EventRepository.class);
         memberRepository = mock(ConversationMemberRepository.class);
         userEventRepository = mock(UserEventRepository.class);
+
         when(eventRepository.saveEvent(
                         nullable(UUID.class),
                         anyString(),
@@ -82,9 +88,11 @@ class ChatMessageHandlerTest {
                         nullable(UUID.class),
                         anyString()))
                 .thenReturn(CompletableFuture.completedFuture(null));
+
         when(userEventRepository.saveUserEvent(
                         any(UUID.class), anyString(), any(UUID.class), any(UUID.class)))
                 .thenReturn(CompletableFuture.completedFuture(null));
+
         senderChannel =
                 new EmbeddedChannel(
                         new ChatMessageHandler(
@@ -108,7 +116,6 @@ class ChatMessageHandlerTest {
     @ParameterizedTest
     @ValueSource(strings = {"SGVsbG8gd29ybGQh", "U29tZSBvdGhlciB0ZXh0", "SGVsbG8=", "SGVsbA=="})
     void testValidSendMessageFormat(String base64Payload) {
-
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
@@ -119,17 +126,10 @@ class ChatMessageHandlerTest {
                             CompletableFuture.completedFuture(List.of(TEST_USER_ID, BOB_USER_ID)));
 
             String message = "SEND " + CONVERSATION_ID + " " + CREATED_AT + " " + base64Payload;
-
             senderChannel.writeInbound(message);
 
-            Object outbound = recipientChannel.readOutbound();
-
-            Assertions.assertNotNull(outbound);
-            Assertions.assertTrue(outbound.toString().startsWith("EVENT MESSAGE_CREATED "));
-
-            Assertions.assertTrue(outbound.toString().contains(CONVERSATION_ID.toString()));
-            Assertions.assertTrue(outbound.toString().contains(TEST_USER_ID.toString()));
-            Assertions.assertTrue(outbound.toString().endsWith(base64Payload));
+            Envelope outbound = recipientChannel.readOutbound();
+            assertEventEnvelope(outbound, CONVERSATION_ID, TEST_USER_ID, base64Payload);
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -149,7 +149,6 @@ class ChatMessageHandlerTest {
                 "YWJjZGVmZ2hpamtsbW5vcA=="
             })
     void testValidBase64Payload(String base64Payload) {
-
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
@@ -167,13 +166,8 @@ class ChatMessageHandlerTest {
                             + " "
                             + base64Payload);
 
-            Object outbound = recipientChannel.readOutbound();
-
-            Assertions.assertNotNull(outbound);
-            Assertions.assertTrue(outbound.toString().startsWith("EVENT MESSAGE_CREATED "));
-            Assertions.assertTrue(outbound.toString().contains(CONVERSATION_ID.toString()));
-            Assertions.assertTrue(outbound.toString().contains(TEST_USER_ID.toString()));
-            Assertions.assertTrue(outbound.toString().endsWith(base64Payload));
+            Envelope outbound = recipientChannel.readOutbound();
+            assertEventEnvelope(outbound, CONVERSATION_ID, TEST_USER_ID, base64Payload);
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -182,7 +176,6 @@ class ChatMessageHandlerTest {
 
     @Test
     void testMultipleMessagesToSameConversation() {
-
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
@@ -206,28 +199,22 @@ class ChatMessageHandlerTest {
                             anyString()))
                     .thenReturn(firstSave)
                     .thenReturn(secondSave);
+
             senderChannel.writeInbound(
                     "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "SGVsbG8=");
             Assertions.assertNull(recipientChannel.readOutbound());
-            firstSave.complete(null);
-            Object first = recipientChannel.readOutbound();
 
-            Assertions.assertNotNull(first);
-            Assertions.assertTrue(first.toString().startsWith("EVENT MESSAGE_CREATED "));
-            Assertions.assertTrue(first.toString().contains(CONVERSATION_ID.toString()));
-            Assertions.assertTrue(first.toString().contains(TEST_USER_ID.toString()));
-            Assertions.assertTrue(first.toString().endsWith("SGVsbG8="));
+            firstSave.complete(null);
+            Envelope first = recipientChannel.readOutbound();
+            assertEventEnvelope(first, CONVERSATION_ID, TEST_USER_ID, "SGVsbG8=");
+
             senderChannel.writeInbound(
                     "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "V29ybGQ=");
             Assertions.assertNull(recipientChannel.readOutbound());
-            secondSave.complete(null);
-            Object second = recipientChannel.readOutbound();
 
-            Assertions.assertNotNull(second);
-            Assertions.assertTrue(second.toString().startsWith("EVENT MESSAGE_CREATED "));
-            Assertions.assertTrue(second.toString().contains(CONVERSATION_ID.toString()));
-            Assertions.assertTrue(second.toString().contains(TEST_USER_ID.toString()));
-            Assertions.assertTrue(second.toString().endsWith("V29ybGQ="));
+            secondSave.complete(null);
+            Envelope second = recipientChannel.readOutbound();
+            assertEventEnvelope(second, CONVERSATION_ID, TEST_USER_ID, "V29ybGQ=");
 
         } finally {
             recipientChannel.finishAndReleaseAll();
@@ -236,7 +223,6 @@ class ChatMessageHandlerTest {
 
     @Test
     void testMessageDeliveredToConversationMembers() {
-
         EmbeddedChannel bobChannel = new EmbeddedChannel();
         EmbeddedChannel aliceChannel = new EmbeddedChannel();
 
@@ -251,17 +237,11 @@ class ChatMessageHandlerTest {
             senderChannel.writeInbound(
                     "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "SGVsbG8=");
 
-            Object bobMessage = bobChannel.readOutbound();
-            Object aliceMessage = aliceChannel.readOutbound();
+            Envelope bobMessage = bobChannel.readOutbound();
+            Envelope aliceMessage = aliceChannel.readOutbound();
 
-            Assertions.assertNotNull(bobMessage);
-            Assertions.assertNotNull(aliceMessage);
-
-            Assertions.assertTrue(bobMessage.toString().contains(CONVERSATION_ID.toString()));
-            Assertions.assertTrue(aliceMessage.toString().contains(CONVERSATION_ID.toString()));
-
-            Assertions.assertTrue(bobMessage.toString().endsWith("SGVsbG8="));
-            Assertions.assertTrue(aliceMessage.toString().endsWith("SGVsbG8="));
+            assertEventEnvelope(bobMessage, CONVERSATION_ID, TEST_USER_ID, "SGVsbG8=");
+            assertEventEnvelope(aliceMessage, CONVERSATION_ID, TEST_USER_ID, "SGVsbG8=");
 
         } finally {
             bobChannel.finishAndReleaseAll();
@@ -288,25 +268,17 @@ class ChatMessageHandlerTest {
 
     @Test
     void testSendToConversationWithNoConnectedMembers() {
-
         when(memberRepository.findMemberIds(CONVERSATION_ID))
                 .thenReturn(CompletableFuture.completedFuture(List.of(BOB_USER_ID)));
 
         senderChannel.writeInbound(
                 "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "SGVsbG8=");
 
-        /*
-         * The event is persisted even though Bob is offline.
-         * There should NOT be:
-         *
-         * ERROR Recipient not connected
-         */
         Assertions.assertNull(senderChannel.readOutbound());
     }
 
     @Test
     void testSenderUserIdIsIncludedInEvent() {
-
         EmbeddedChannel recipientChannel = new EmbeddedChannel();
 
         try {
@@ -324,13 +296,26 @@ class ChatMessageHandlerTest {
             senderChannel.writeInbound(
                     "SEND " + CONVERSATION_ID + " " + Instant.parse(CREATED_AT) + " " + "SGVsbG8=");
 
-            Object outbound = recipientChannel.readOutbound();
-
-            Assertions.assertNotNull(outbound);
-            Assertions.assertTrue(outbound.toString().contains(ALICE_USER_ID.toString()));
+            Envelope outbound = recipientChannel.readOutbound();
+            assertEventEnvelope(outbound, CONVERSATION_ID, ALICE_USER_ID, "SGVsbG8=");
 
         } finally {
             recipientChannel.finishAndReleaseAll();
+        }
+    }
+
+    private static void assertEventEnvelope(
+            Envelope env, UUID expectedConvId, UUID expectedSenderId, String expectedPayload) {
+        Assertions.assertNotNull(env, "Outbound envelope must not be null");
+        try {
+            Assertions.assertEquals(Opcode.EVENT, env.getHeader().opcode());
+            Event event = BinaryMessages.decodeEvent(env.getBody());
+            Assertions.assertEquals(expectedConvId, event.conversationId());
+            Assertions.assertEquals(expectedSenderId, event.senderId());
+            Assertions.assertEquals(EventType.MESSAGE_CREATED, event.eventType());
+            Assertions.assertEquals(expectedPayload, event.payload());
+        } finally {
+            env.release();
         }
     }
 }
