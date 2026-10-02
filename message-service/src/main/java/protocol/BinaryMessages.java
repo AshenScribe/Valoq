@@ -26,6 +26,9 @@ package protocol;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import server.model.Event;
 import server.model.EventType;
@@ -33,6 +36,25 @@ import server.model.EventType;
 public final class BinaryMessages {
 
     private BinaryMessages() {}
+
+    public enum ReceiptMode {
+        WATERMARK((byte) 0x00),
+        EXPLICIT_LIST((byte) 0x01);
+
+        private final byte code;
+
+        ReceiptMode(byte code) {
+            this.code = code;
+        }
+
+        public static ReceiptMode fromByte(byte b) {
+            return b == 0x00 ? WATERMARK : EXPLICIT_LIST;
+        }
+
+        public byte getCode() {
+            return code;
+        }
+    }
 
     public record InitRequest(String token) {
         public static InitRequest decode(ByteBuf body) {
@@ -61,8 +83,69 @@ public final class BinaryMessages {
         }
     }
 
+    public record ReceiptRequest(
+            UUID conversationId,
+            ReceiptMode mode,
+            UUID watermarkEventId,
+            List<UUID> explicitEventIds) {
+
+        public static ReceiptRequest watermark(UUID conversationId, UUID watermarkEventId) {
+            return new ReceiptRequest(
+                    conversationId,
+                    ReceiptMode.WATERMARK,
+                    watermarkEventId,
+                    Collections.emptyList());
+        }
+
+        public static ReceiptRequest explicit(UUID conversationId, List<UUID> eventIds) {
+            return new ReceiptRequest(conversationId, ReceiptMode.EXPLICIT_LIST, null, eventIds);
+        }
+
+        public static ReceiptRequest decode(ByteBuf body) {
+            UUID convId = BufferUtil.readUUID(body);
+            ReceiptMode mode = ReceiptMode.fromByte(body.readByte());
+
+            if (mode == ReceiptMode.WATERMARK) {
+                UUID watermark = BufferUtil.readUUID(body);
+                return new ReceiptRequest(convId, mode, watermark, Collections.emptyList());
+            } else {
+                int count = body.readUnsignedShort();
+                List<UUID> ids = new ArrayList<>(count);
+                for (int i = 0; i < count; i++) {
+                    ids.add(BufferUtil.readUUID(body));
+                }
+                return new ReceiptRequest(convId, mode, null, ids);
+            }
+        }
+
+        public static void encode(ReceiptRequest req, ByteBuf dest) {
+            BufferUtil.writeUUID(req.conversationId(), dest);
+            dest.writeByte(req.mode().code);
+
+            if (req.mode() == ReceiptMode.WATERMARK) {
+                BufferUtil.writeUUID(req.watermarkEventId(), dest);
+            } else {
+                dest.writeShort(req.explicitEventIds().size());
+                for (UUID id : req.explicitEventIds()) {
+                    BufferUtil.writeUUID(id, dest);
+                }
+            }
+        }
+    }
+
     public static Envelope createReadyResponse(int streamId) {
         return Envelope.createEmpty(Opcode.READY, streamId);
+    }
+
+    /** Server ACK: Sent back to sender when message is saved to Cassandra (1st check / SENT). */
+    public static Envelope createAckResponse(int streamId, UUID eventId, ByteBufAllocator alloc) {
+        ByteBuf body = alloc.buffer(16);
+        BufferUtil.writeUUID(eventId, body);
+        return Envelope.create(Opcode.ACK, streamId, body);
+    }
+
+    public static UUID decodeAckResponse(ByteBuf body) {
+        return BufferUtil.readUUID(body);
     }
 
     public static Envelope createErrorResponse(

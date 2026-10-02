@@ -29,19 +29,30 @@ public enum Opcode {
     READY((byte) 0x02),
     SEND((byte) 0x03),
     EVENT((byte) 0x04),
-    SYNC((byte) 0x05);
+    SYNC((byte) 0x05),
+    ACK((byte) 0x06),
+    ACK_DELIVERED((byte) 0x07),
+    ACK_READ((byte) 0x08);
 
-    private static final Opcode[] LOOKUP = new Opcode[6];
+    private static final Opcode[] LOOKUP;
+
+    static {
+        int maxOpcode = -1;
+        for (Opcode op : values()) {
+            if (op.code > maxOpcode) {
+                maxOpcode = op.code;
+            }
+        }
+        LOOKUP = new Opcode[maxOpcode + 1];
+        for (Opcode op : values()) {
+            LOOKUP[op.code] = op;
+        }
+    }
+
     private final byte code;
 
     Opcode(byte code) {
         this.code = code;
-    }
-
-    static {
-        for (Opcode op : values()) {
-            LOOKUP[op.code] = op;
-        }
     }
 
     public static Opcode fromByte(byte b) {

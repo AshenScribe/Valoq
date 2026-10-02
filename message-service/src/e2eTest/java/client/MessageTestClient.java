@@ -42,6 +42,7 @@ import java.security.PrivateKey;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -59,7 +60,12 @@ public class MessageTestClient implements AutoCloseable {
 
     private final EventLoopGroup group;
     private final Channel channel;
+
+    // Cassandra SimpleClient pattern: separate server push events from synchronous request/response
+    // envelopes
+    private final BlockingQueue<Event> events = new LinkedBlockingQueue<>();
     private final BlockingQueue<Envelope> responses = new LinkedBlockingQueue<>();
+
     private final PrivateKey privateKey;
     private final AtomicInteger streamSequence = new AtomicInteger(0);
 
@@ -97,7 +103,20 @@ public class MessageTestClient implements AutoCloseable {
                                                             protected void channelRead0(
                                                                     ChannelHandlerContext ctx,
                                                                     Envelope msg) {
-                                                                responses.offer(msg);
+                                                                if (msg.getHeader().opcode()
+                                                                        == Opcode.EVENT) {
+                                                                    try {
+                                                                        events.offer(
+                                                                                BinaryMessages
+                                                                                        .decodeEvent(
+                                                                                                msg
+                                                                                                        .getBody()));
+                                                                    } finally {
+                                                                        msg.release();
+                                                                    }
+                                                                } else {
+                                                                    responses.offer(msg);
+                                                                }
                                                             }
                                                         });
                                     }
@@ -112,16 +131,19 @@ public class MessageTestClient implements AutoCloseable {
             flush();
 
             Envelope response = readEnvelope();
-            if (response.getHeader().opcode() == Opcode.READY) {
-                response.release();
-                return "SUCCESS";
-            } else if (response.getHeader().opcode() == Opcode.ERROR) {
-                String err = BufferUtil.readString(response.getBody());
-                response.release();
-                return err;
+            if (response == null) {
+                return "TIMEOUT";
             }
-            response.release();
-            return "UNKNOWN";
+            try {
+                if (response.getHeader().opcode() == Opcode.READY) {
+                    return "SUCCESS";
+                } else if (response.getHeader().opcode() == Opcode.ERROR) {
+                    return BufferUtil.readString(response.getBody());
+                }
+                return "UNKNOWN";
+            } finally {
+                response.release();
+            }
 
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -179,17 +201,11 @@ public class MessageTestClient implements AutoCloseable {
     }
 
     public Event readEvent(Duration timeout) {
-        Envelope env = readEnvelope(timeout);
-        if (env == null) {
-            return null;
-        }
         try {
-            if (env.getHeader().opcode() == Opcode.EVENT) {
-                return BinaryMessages.decodeEvent(env.getBody());
-            }
-            return null;
-        } finally {
-            env.release();
+            return events.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
         }
     }
 
@@ -203,6 +219,22 @@ public class MessageTestClient implements AutoCloseable {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
+        }
+    }
+
+    /** Reads a server ACK confirming a SEND message was committed. */
+    public UUID readAck() {
+        Envelope env = readEnvelope(Duration.ofSeconds(2));
+        if (env == null) {
+            return null;
+        }
+        try {
+            if (env.getHeader().opcode() == Opcode.ACK) {
+                return BinaryMessages.decodeAckResponse(env.getBody());
+            }
+            return null;
+        } finally {
+            env.release();
         }
     }
 
@@ -245,5 +277,40 @@ public class MessageTestClient implements AutoCloseable {
     public void close() {
         channel.close();
         group.shutdownGracefully();
+    }
+
+    public void ackDeliveredWatermark(UUID conversationId, UUID watermarkEventId) {
+        sendReceipt(
+                conversationId,
+                Opcode.ACK_DELIVERED,
+                BinaryMessages.ReceiptRequest.watermark(conversationId, watermarkEventId));
+    }
+
+    public void ackReadWatermark(UUID conversationId, UUID watermarkEventId) {
+        sendReceipt(
+                conversationId,
+                Opcode.ACK_READ,
+                BinaryMessages.ReceiptRequest.watermark(conversationId, watermarkEventId));
+    }
+
+    public void ackReadExplicit(UUID conversationId, List<UUID> eventIds) {
+        sendReceipt(
+                conversationId,
+                Opcode.ACK_READ,
+                BinaryMessages.ReceiptRequest.explicit(conversationId, eventIds));
+    }
+
+    private void sendReceipt(
+            UUID conversationId, Opcode opcode, BinaryMessages.ReceiptRequest request) {
+        try {
+            int streamId = streamSequence.incrementAndGet();
+            ByteBuf body = channel.alloc().buffer();
+            BinaryMessages.ReceiptRequest.encode(request, body);
+
+            Envelope envelope = Envelope.create(opcode, streamId, body);
+            channel.writeAndFlush(envelope).sync();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

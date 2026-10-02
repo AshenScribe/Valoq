@@ -79,6 +79,9 @@ public class CommandDispatcherHandler extends SimpleChannelInboundHandler<Envelo
             case INIT -> handleInit(ctx, conn, envelope, streamId);
             case SEND -> handleSend(ctx, conn, envelope, streamId);
             case SYNC -> handleSync(ctx, conn, envelope, streamId);
+            case ACK_DELIVERED ->
+                    handleReceipt(ctx, conn, envelope, streamId, EventType.MESSAGE_DELIVERED);
+            case ACK_READ -> handleReceipt(ctx, conn, envelope, streamId, EventType.MESSAGE_READ);
             default -> {
                 Envelope err =
                         BinaryMessages.createErrorResponse(
@@ -113,7 +116,6 @@ public class CommandDispatcherHandler extends SimpleChannelInboundHandler<Envelo
             connectionTracker.register(userId, ctx.channel());
             conn.authenticate(userId);
 
-            // Send READY response stamped with client's streamId
             ctx.writeAndFlush(BinaryMessages.createReadyResponse(streamId));
 
         } catch (Exception e) {
@@ -157,10 +159,17 @@ public class CommandDispatcherHandler extends SimpleChannelInboundHandler<Envelo
 
             lastRouteFuture =
                     lastRouteFuture
-                            .handle((res, ex) -> null)
-                            .thenCompose(v -> messageRouter.route(event))
+                            .handle((_, _) -> null)
+                            .thenCompose(_ -> messageRouter.route(event))
+                            .thenAccept(
+                                    persistedEventId -> {
+                                        Envelope ack =
+                                                BinaryMessages.createAckResponse(
+                                                        streamId, persistedEventId, ctx.alloc());
+                                        ctx.writeAndFlush(ack);
+                                    })
                             .whenComplete(
-                                    (res, ex) -> {
+                                    (_, _) -> {
                                         int remaining = inFlightCount.decrementAndGet();
                                         if (remaining <= LOW_WATERMARK) {
                                             ChannelConfig config = ctx.channel().config();
@@ -174,6 +183,42 @@ public class CommandDispatcherHandler extends SimpleChannelInboundHandler<Envelo
             Envelope err =
                     BinaryMessages.createErrorResponse(
                             streamId, "ERROR Invalid SEND format", ctx.alloc());
+            ctx.writeAndFlush(err);
+        } finally {
+            env.release();
+        }
+    }
+
+    private void handleReceipt(
+            ChannelHandlerContext ctx,
+            ClientConnection conn,
+            Envelope env,
+            int streamId,
+            EventType receiptType) {
+        if (!conn.isAuthenticated()) {
+            Envelope err =
+                    BinaryMessages.createErrorResponse(
+                            streamId, "ERROR Session not initialized", ctx.alloc());
+            ctx.writeAndFlush(err);
+            env.release();
+            return;
+        }
+
+        try {
+            BinaryMessages.ReceiptRequest req = BinaryMessages.ReceiptRequest.decode(env.getBody());
+
+            lastRouteFuture =
+                    lastRouteFuture
+                            .handle((_, _) -> null)
+                            .thenCompose(
+                                    _ ->
+                                            messageRouter.routeReceipt(
+                                                    conn.getUserId(), req, receiptType));
+
+        } catch (Exception e) {
+            Envelope err =
+                    BinaryMessages.createErrorResponse(
+                            streamId, "ERROR Invalid receipt format", ctx.alloc());
             ctx.writeAndFlush(err);
         } finally {
             env.release();
@@ -214,7 +259,7 @@ public class CommandDispatcherHandler extends SimpleChannelInboundHandler<Envelo
                                 ctx.flush();
                             })
                     .exceptionally(
-                            error -> {
+                            _ -> {
                                 Envelope err =
                                         BinaryMessages.createErrorResponse(
                                                 streamId, "ERROR SYNC failed", ctx.alloc());

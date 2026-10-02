@@ -23,12 +23,13 @@
  */
 package server;
 
-import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.uuid.Uuids;
 import database.BucketUtils;
 import database.ConversationMemberRepository;
 import database.EventRepository;
 import database.UserEventRepository;
+import io.netty.buffer.PooledByteBufAllocator;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +38,7 @@ import java.util.concurrent.CompletionStage;
 import protocol.BinaryMessages;
 import protocol.Envelope;
 import server.model.Event;
+import server.model.EventType;
 
 public class MessageRouter {
 
@@ -64,7 +66,7 @@ public class MessageRouter {
         this.userEventRepository = userEventRepository;
     }
 
-    public CompletionStage<AsyncResultSet> route(Event event) {
+    public CompletionStage<UUID> route(Event event) {
         UUID eventId = Uuids.timeBased();
         String timeBucket = BucketUtils.toTimeBucket(event.createdAt());
 
@@ -97,9 +99,7 @@ public class MessageRouter {
                                                             BinaryMessages.createEventEnvelope(
                                                                     persistedEvent,
                                                                     Envelope.EVENT_STREAM_ID,
-                                                                    io.netty.buffer
-                                                                            .PooledByteBufAllocator
-                                                                            .DEFAULT);
+                                                                    PooledByteBufAllocator.DEFAULT);
 
                                                     connectionTracker.broadcastToUsers(
                                                             members, eventEnvelope);
@@ -122,7 +122,57 @@ public class MessageRouter {
                                                                     indexFutures.toArray(
                                                                             new CompletableFuture
                                                                                     [0]))
-                                                            .thenApply(v -> result);
+                                                            .thenApply(v -> eventId);
+                                                }));
+    }
+
+    public CompletionStage<Void> routeReceipt(
+            UUID actorId, BinaryMessages.ReceiptRequest request, EventType type) {
+        Instant now = Instant.now();
+        String timeBucket = BucketUtils.toTimeBucket(now);
+        UUID receiptEventId = Uuids.timeBased();
+
+        UUID targetEntityId =
+                request.mode() == BinaryMessages.ReceiptMode.WATERMARK
+                        ? request.watermarkEventId()
+                        : (request.explicitEventIds().isEmpty()
+                                ? null
+                                : request.explicitEventIds().get(0));
+
+        String payload =
+                request.mode() == BinaryMessages.ReceiptMode.WATERMARK
+                        ? "WATERMARK"
+                        : String.join(
+                                ",",
+                                request.explicitEventIds().stream().map(UUID::toString).toList());
+
+        Event receiptEvent =
+                new Event(actorId, request.conversationId(), receiptEventId, type, payload, now);
+
+        return memberRepository
+                .findMemberIds(request.conversationId())
+                .thenCompose(
+                        members ->
+                                eventRepository
+                                        .saveEvent(
+                                                request.conversationId(),
+                                                timeBucket,
+                                                0,
+                                                receiptEventId,
+                                                type.name(),
+                                                actorId,
+                                                targetEntityId,
+                                                payload)
+                                        .thenAccept(
+                                                res -> {
+                                                    Envelope receiptEnvelope =
+                                                            BinaryMessages.createEventEnvelope(
+                                                                    receiptEvent,
+                                                                    Envelope.EVENT_STREAM_ID,
+                                                                    PooledByteBufAllocator.DEFAULT);
+
+                                                    connectionTracker.broadcastToUsers(
+                                                            members, receiptEnvelope);
                                                 }));
     }
 }

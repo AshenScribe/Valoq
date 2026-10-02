@@ -37,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import protocol.Envelope;
 import protocol.Opcode;
 import server.model.Event;
+import server.model.EventType;
 
 class MessageServerE2ETest extends BaseIntegrationTest {
 
@@ -288,6 +289,39 @@ class MessageServerE2ETest extends BaseIntegrationTest {
                 Event event = bob.readEvent();
                 assertMessageEvent(event, CONVERSATION_ID, ALICE_UUID, "UGlwcGVsaW5lZA==");
             }
+        }
+    }
+
+    @Test
+    @DisplayName("Full Delivery & Read Receipt Lifecycle with Watermarking")
+    void testReceiptLifecycle() throws Exception {
+        addConversationMembers(CONVERSATION_ID, ALICE_UUID, BOB_UUID);
+
+        try (MessageTestClient alice = connect();
+                MessageTestClient bob = connect()) {
+
+            alice.init(ALICE_UUID);
+            bob.init(BOB_UUID);
+            alice.sendMessage(CONVERSATION_ID, CREATED_AT, "Receipt Test Message");
+            UUID messageEventId = alice.readAck();
+            Assertions.assertNotNull(messageEventId, "Alice must receive server ACK with eventId");
+            Event bobMessage = bob.readEvent();
+            Assertions.assertNotNull(bobMessage);
+            Assertions.assertEquals(messageEventId, bobMessage.eventId());
+            Event aliceEcho = alice.readEvent();
+            Assertions.assertNotNull(aliceEcho);
+            bob.ackDeliveredWatermark(CONVERSATION_ID, messageEventId);
+
+            Event aliceDeliveryReceipt = alice.readEvent();
+            Assertions.assertNotNull(aliceDeliveryReceipt);
+            Assertions.assertEquals(EventType.MESSAGE_DELIVERED, aliceDeliveryReceipt.eventType());
+            Assertions.assertEquals(BOB_UUID, aliceDeliveryReceipt.senderId());
+            bob.ackReadWatermark(CONVERSATION_ID, messageEventId);
+
+            Event aliceReadReceipt = alice.readEvent();
+            Assertions.assertNotNull(aliceReadReceipt);
+            Assertions.assertEquals(EventType.MESSAGE_READ, aliceReadReceipt.eventType());
+            Assertions.assertEquals(BOB_UUID, aliceReadReceipt.senderId());
         }
     }
 

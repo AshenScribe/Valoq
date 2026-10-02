@@ -7,7 +7,16 @@
     <option name="selectedModelId" value="auto" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="6c2958ed-9e0b-45ac-beed-512b148be61a" name="Changes" comment="" />
+    <list default="true" id="6c2958ed-9e0b-45ac-beed-512b148be61a" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/message-service/src/e2eTest/java/client/MessageTestClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/message-service/src/e2eTest/java/client/MessageTestClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/message-service/src/e2eTest/java/server/MessageServerE2ETest.java" beforeDir="false" afterPath="$PROJECT_DIR$/message-service/src/e2eTest/java/server/MessageServerE2ETest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/message-service/src/main/java/protocol/BinaryMessages.java" beforeDir="false" afterPath="$PROJECT_DIR$/message-service/src/main/java/protocol/BinaryMessages.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/message-service/src/main/java/protocol/Opcode.java" beforeDir="false" afterPath="$PROJECT_DIR$/message-service/src/main/java/protocol/Opcode.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/message-service/src/main/java/server/MessageRouter.java" beforeDir="false" afterPath="$PROJECT_DIR$/message-service/src/main/java/server/MessageRouter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/message-service/src/main/java/server/handler/CommandDispatcherHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/message-service/src/main/java/server/handler/CommandDispatcherHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/message-service/src/main/java/server/model/EventType.java" beforeDir="false" afterPath="$PROJECT_DIR$/message-service/src/main/java/server/model/EventType.java" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -167,7 +176,7 @@
     "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary": "JUnit5",
     "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit5": "",
     "copilot.chat.legacySessionMetadata.migrated": "true",
-    "git-widget-placeholder": "master",
+    "git-widget-placeholder": "receipts",
     "last.edited.regexp": "SEND sk skd sk",
     "last_opened_file_path": "/home/rishabh/Valoq/auth-service",
     "project.structure.last.edited": "Modules",
