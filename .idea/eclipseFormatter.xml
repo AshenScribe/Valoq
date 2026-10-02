@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="EclipseFormatterSettings">
+    <option name="formatterEnabled" value="false" />
+    <option name="formatOnSaveEnabled" value="false" />
+    <option name="notifyEnabled" value="true" />
+    <option name="uiLanguage" value="follow_ide" />
+    <option name="formatterConfigType" value="custom" />
+    <option name="formatterConfigPath" value="" />
+    <option name="formatterProfile" value="" />
+    <option name="importOrganizeEnabled" value="true" />
+    <option name="importOrderType" value="manual" />
+    <option name="importOrderManual" value="java;javax;org;com;" />
+    <option name="importOrderPath" value="" />
+  </component>
+</project>

@@ -1,0 +1,5 @@
+.idea/
+auth-service/.gradle
+auth-service/build
+message-service/.gradle
+message-service/build
