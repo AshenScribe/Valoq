@@ -48,16 +48,18 @@ services:
       - ./script/init.cql:/init.cql:ro
     entrypoint: ["/bin/bash", "-c"]
     command: >
-      "cqlsh cassandra 9042
-      -u cassandra
-      -p cassandra
-      -f /init.cql"
+      "echo 'Waiting for Cassandra CQL port to accept connections...' &&
+      until cqlsh cassandra 9042 -u cassandra -p cassandra -e 'describe keyspaces' >/dev/null 2>&1; do
+        sleep 2;
+      done &&
+      echo 'Cassandra is ready. Running initialization script...' &&
+      cqlsh cassandra 9042 -u cassandra -p cassandra -f /init.cql"
 
   auth-service:
     build:
       context: ./auth-service
       dockerfile: Dockerfile
-    container_name: valoq-auth-service
+    container_name: auth-service
     ports:
       - "8081:8081"
     environment:
@@ -71,6 +73,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "printf 'PING\n' | nc localhost 8081 | grep -q 'OK' || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
 
   message-service:
     build:
@@ -94,6 +101,5 @@ services:
     depends_on:
       cassandra-init:
         condition: service_completed_successfully
-
       auth-service:
         condition: service_started

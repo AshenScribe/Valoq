@@ -49,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 import server.codec.CommandDecoder;
 import server.handler.AuthenticationHandler;
 import server.handler.ConnectionLimitHandler;
+import server.handler.HealthHandler;
 import server.handler.IdleConnectionReaperHandler;
 import server.handler.InboundExceptionHandler;
 import server.handler.PublicKeyHandler;
@@ -153,6 +154,7 @@ public class AuthServer {
             ch.pipeline().addLast("frameDecoder", new LineBasedFrameDecoder(maxFrameLength));
             ch.pipeline().addLast("stringDecoder", new StringDecoder(StandardCharsets.UTF_8));
             ch.pipeline().addLast("publicKeyHandler", PublicKeyHandler.INSTANCE);
+            ch.pipeline().addLast("healthHandler", HealthHandler.INSTANCE);
             ch.pipeline().addLast("commandDecoder", new CommandDecoder());
             ch.pipeline().addLast("authenticationHandler", AuthenticationHandler.INSTANCE);
             ch.pipeline().addLast("exceptionHandler", InboundExceptionHandler.INSTANCE);

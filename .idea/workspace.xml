@@ -8,11 +8,21 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6c2958ed-9e0b-45ac-beed-512b148be61a" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/auth-service/PROTOCOL.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/auth-service/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/message-service/PROTOCOL.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/auth-service/src/main/java/config/AppConfig.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/auth-service/src/main/java/server/handler/HealthHandler.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/auth-service/src/main/resources/auth-config.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/message-service/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/message-service/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/auth-service/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/auth-service/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/auth-service/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/auth-service/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/auth-service/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/auth-service/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/auth-service/gradle.lockfile" beforeDir="false" afterPath="$PROJECT_DIR$/auth-service/gradle.lockfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/auth-service/gradle/libs.versions.toml" beforeDir="false" afterPath="$PROJECT_DIR$/auth-service/gradle/libs.versions.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/auth-service/src/e2eTest/resources/config.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/auth-service/src/main/java/config/ConfigLoader.java" beforeDir="false" afterPath="$PROJECT_DIR$/auth-service/src/main/java/config/ConfigLoader.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/auth-service/src/main/java/server/AuthServer.java" beforeDir="false" afterPath="$PROJECT_DIR$/auth-service/src/main/java/server/AuthServer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/auth-service/src/main/resources/config.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docker-compose.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -180,7 +190,7 @@
     "project.structure.proportion": "0.15",
     "project.structure.side.proportion": "0.2",
     "python.packages.toolwindow.project.migrated.to.right.top.v2": "true",
-    "settings.editor.selected.configurable": "configurable.group.build"
+    "settings.editor.selected.configurable": "reference.settingsdialog.IDE.editor.colors.org.toml.ide.colors.TomlColorSettingsPage"
   }
 }]]></component>
   <component name="RecentsManager">

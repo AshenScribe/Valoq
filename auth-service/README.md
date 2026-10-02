@@ -82,7 +82,7 @@ The server bootstrap is optimized for low-latency identity transactions:
 ```
 
 ### Environment Configuration
-The service is configured via environment variables or `config.yaml`:
+The service is configured via environment variables or `auth-config.properties`:
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |

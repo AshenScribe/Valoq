@@ -37,7 +37,7 @@ dependencies {
     runtimeOnly libs.jjwt.impl
     runtimeOnly libs.jjwt.jackson
 
-    implementation libs.snake.yaml
+    implementation libs.owner
     implementation libs.hikaricp
     runtimeOnly libs.postgresql
     implementation libs.h2.db

@@ -16,18 +16,19 @@ RUN --mount=type=cache,target=${GRADLE_USER_HOME} \
     ./gradlew --version --no-daemon
 
 COPY settings.gradle ./
+COPY *lockfile* ./
 COPY build.gradle ./
-COPY gradle.lockfile ./
 
 RUN --mount=type=cache,target=${GRADLE_USER_HOME} \
     --mount=type=cache,target=${GRADLE_USER_HOME}/wrapper \
     ./gradlew dependencies --no-daemon --console=plain
 
 COPY src ./src
+COPY LICENSE_HEADER .
 
 RUN --mount=type=cache,target=${GRADLE_USER_HOME} \
     --mount=type=cache,target=${GRADLE_USER_HOME}/wrapper \
-    ./gradlew build --no-daemon \
+    ./gradlew installDist --no-daemon \
         -x test \
         -x e2eTest \
         -x check \
@@ -35,16 +36,14 @@ RUN --mount=type=cache,target=${GRADLE_USER_HOME} \
         -x spotlessApply \
         --console=plain
 
-FROM eclipse-temurin:25-jre-alpine AS runtime
+FROM eclipse-temurin:25-jre-jammy AS runtime
 
 WORKDIR /app
 
-COPY --from=builder /app/build/libs/*.jar app.jar
+COPY --from=builder /app/build/install/auth-service /app
 
 EXPOSE 8081
 
-ENTRYPOINT ["java", \
-    "-XX:+UseZGC", \
-    "-XX:+UseContainerSupport", \
-    "-Djava.security.egd=file:/dev/./urandom", \
-    "-jar", "app.jar"]
+ENV JAVA_OPTS="-XX:+UseZGC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
+
+ENTRYPOINT ["/app/bin/auth-service"]

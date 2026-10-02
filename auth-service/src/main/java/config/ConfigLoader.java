@@ -23,17 +23,25 @@
  */
 package config;
 
-import java.io.InputStream;
-import org.yaml.snakeyaml.Yaml;
+import org.aeonbits.owner.ConfigFactory;
 
 public class ConfigLoader {
 
     public ServerConfig appConfig() {
-        Yaml yaml = new Yaml();
+        AppConfig config = ConfigFactory.create(AppConfig.class);
+        ServerConfig serverConfig = new ServerConfig();
+        serverConfig.server().setHost(config.serverHost());
+        serverConfig.server().setPort(config.serverPort());
+        serverConfig.server().ssl().setEnabled(config.serverSslEnabled());
 
-        InputStream inputStream = getClass().getClassLoader().getResourceAsStream("config.yaml");
+        serverConfig.database().setHost(config.databaseHost());
+        serverConfig.database().setPort(config.databasePort());
+        serverConfig.database().setName(config.databaseName());
+        serverConfig.database().setUsername(config.databaseUsername());
+        serverConfig.database().setPassword(config.databasePassword());
+        serverConfig.database().ssl().setMode(config.databaseSslMode());
+        serverConfig.jwt().setExpirationSeconds(config.jwtExpirationSeconds());
 
-        if (inputStream == null) throw new IllegalStateException("config.yaml not found");
-        return yaml.loadAs(inputStream, ServerConfig.class);
+        return serverConfig;
     }
 }

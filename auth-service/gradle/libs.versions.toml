@@ -7,9 +7,9 @@ jackson-databind = "2.22.2"
 jjwt = "0.13.0"
 junit = "5.7.1"
 netty = "4.2.18.Final"
+owner = "1.0.12"
 postgresql = "42.7.13"
 slf4j = "2.0.19"
-snake-yaml = "2.7"
 testcontainer = "2.0.5"
 
 [libraries]
@@ -41,9 +41,9 @@ netty-common = { module = "io.netty:netty-common" }
 netty-codec = { module = "io.netty:netty-codec" }
 netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll" }
 
-postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+owner = { module = "org.aeonbits.owner:owner", version.ref = "owner" }
 
-snake-yaml = { module = "org.yaml:snakeyaml", version.ref = "snake-yaml" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
 
 testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainer" }
 testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainer" }
