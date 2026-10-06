@@ -23,9 +23,12 @@
  */
 package base;
 
+import cache.RedisManager;
 import client.MessageTestClient;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.Row;
+import com.redis.testcontainers.RedisContainer;
+import config.CacheConfig;
 import config.ServerConfig;
 import database.CassandraManager;
 import java.security.KeyPair;
@@ -41,10 +44,16 @@ import server.TestKeyManager;
 
 public abstract class BaseIntegrationTest {
 
+    @SuppressWarnings("resource")
     protected static final CassandraContainer CASSANDRA_CONTAINER =
             new CassandraContainer("cassandra:5.0")
                     .withConfigurationOverride("cassandra-auth")
                     .withInitScript("init.cql");
+
+    private static final String REDIS_PASSWORD = "testpassword123";
+    protected static final RedisContainer REDIS_CONTAINER =
+            new RedisContainer("redis:8.8.3")
+                    .withCommand("redis-server", "--requirepass", REDIS_PASSWORD);
 
     private static MessageServer server;
     private static CqlSession session;
@@ -61,9 +70,8 @@ public abstract class BaseIntegrationTest {
 
         jwt.JwtUtil.getInstance().init(publicKeyBase64);
 
-        if (!CASSANDRA_CONTAINER.isRunning()) {
-            CASSANDRA_CONTAINER.start();
-        }
+        if (!CASSANDRA_CONTAINER.isRunning()) CASSANDRA_CONTAINER.start();
+        if (!REDIS_CONTAINER.isRunning()) REDIS_CONTAINER.start();
 
         Map<String, String> testProps =
                 Map.of(
@@ -82,14 +90,18 @@ public abstract class BaseIntegrationTest {
 
         ServerConfig serverConfig = ConfigFactory.create(ServerConfig.class, testProps);
 
+        RedisManager.getInstance(
+                new CacheConfig(
+                        REDIS_CONTAINER.getHost(),
+                        REDIS_CONTAINER.getFirstMappedPort(),
+                        3600000,
+                        0,
+                        "default",
+                        REDIS_PASSWORD));
         CassandraManager.init(serverConfig);
-
         session = CassandraManager.getSession();
-
         server = new MessageServer(serverConfig);
-
         server.start();
-
         serverPort = server.getPort();
     }
 
@@ -99,7 +111,8 @@ public abstract class BaseIntegrationTest {
         if (server != null) {
             server.stop();
         }
-
+        REDIS_CONTAINER.close();
+        CASSANDRA_CONTAINER.close();
         CassandraManager.close();
     }
 

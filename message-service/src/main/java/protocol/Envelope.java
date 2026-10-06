@@ -75,6 +75,13 @@ public class Envelope {
         return new Envelope(header, body.retainedSlice());
     }
 
+    /**
+     * Decrements the reference count of the underlying Netty {@link io.netty.buffer.ByteBuf} body,
+     * deallocating its memory pool allocations if the reference count reaches zero.
+     *
+     * @see io.netty.buffer.ByteBuf#refCnt()
+     * @see io.netty.buffer.ByteBuf#release()
+     */
     public void release() {
         if (body.refCnt() > 0) {
             body.release();

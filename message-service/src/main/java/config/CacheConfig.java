@@ -23,51 +23,45 @@
  */
 package config;
 
-import org.aeonbits.owner.Config;
+public final class CacheConfig {
+    private final String host;
+    private final int port;
+    private final int ttlMs;
+    private final String username;
+    private final String password;
+    private final int database;
 
-@Config.Sources({"system:env", "classpath:message-service.properties"})
-public interface ServerConfig extends Config {
+    public CacheConfig(
+            String host, int port, int ttlMs, int database, String username, String password) {
+        this.host = host;
+        this.port = port;
+        this.ttlMs = ttlMs;
+        this.database = database;
+        this.username = username;
+        this.password = password;
+    }
 
-    @Key("PORT")
-    @DefaultValue("8002")
-    int serverPort();
+    public String getHost() {
+        return host;
+    }
 
-    @Key("AUTH_HOST")
-    @DefaultValue("localhost")
-    String authHost();
+    public int getPort() {
+        return port;
+    }
 
-    @Key("AUTH_PORT")
-    @DefaultValue("8081")
-    int authPort();
+    public int getTtlMs() {
+        return ttlMs;
+    }
 
-    @Key("DB_HOST")
-    @DefaultValue("localhost")
-    String databaseHost();
+    public String getUsername() {
+        return username;
+    }
 
-    @Key("DB_PORT")
-    @DefaultValue("9042")
-    int databasePort();
+    public String getPassword() {
+        return password;
+    }
 
-    @Key("DB_KEYSPACE")
-    @DefaultValue("valoq_messages")
-    String databaseKeyspace();
-
-    @Key("DB_LOCAL_DATACENTER")
-    @DefaultValue("datacenter1")
-    String databaseLocalDatacenter();
-
-    @Key("DB_USER")
-    @DefaultValue("valoq_message_service")
-    String databaseUsername();
-
-    @Key("DB_PASSWORD")
-    @DefaultValue("message_service_password")
-    String databasePassword();
-
-    @Key("DB_SSL_ENABLED")
-    @DefaultValue("true")
-    boolean databaseSslEnabled();
-
-    @Key("NODE_ID")
-    String nodeId();
+    public int getDatabase() {
+        return database;
+    }
 }

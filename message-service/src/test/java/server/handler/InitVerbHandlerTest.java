@@ -52,6 +52,7 @@ import server.TestKeyManager;
 
 class InitVerbHandlerTest {
 
+    private static final String NODE_ID = "node_id_random";
     private static KeyPair keyPair;
 
     private EmbeddedChannel channel;
@@ -78,7 +79,7 @@ class InitVerbHandlerTest {
 
         session = new Session();
 
-        connectionTracker = new ConnectionTracker();
+        connectionTracker = new ConnectionTracker(NODE_ID);
 
         eventRepository = mock(EventRepository.class);
         memberRepository = mock(ConversationMemberRepository.class);

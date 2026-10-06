@@ -25,6 +25,7 @@ package server.handler;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import java.util.UUID;
 import server.ClientConnection;
 import server.ConnectionTracker;
 
@@ -40,9 +41,12 @@ public class ConnectionLifecycleHandler extends ChannelInboundHandlerAdapter {
     public void channelInactive(ChannelHandlerContext ctx) {
         ClientConnection connection = ClientConnection.get(ctx.channel());
 
-        if (connection != null && connection.getUserId() != null) {
-            connectionTracker.unregister(connection.getUserId(), ctx.channel());
-            connection.markClosing();
+        if (connection != null) {
+            UUID userId = connection.getUserId();
+            if (userId != null) {
+                connectionTracker.unregister(userId, ctx.channel());
+                connection.markClosing();
+            }
         }
 
         ctx.fireChannelInactive();

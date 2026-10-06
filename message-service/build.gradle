@@ -35,11 +35,15 @@ dependencies {
 
     implementation libs.mockito.core
     implementation libs.cassandra.driver
+    e2eTestImplementation platform(libs.testcontainers.bom)
+    e2eTestImplementation libs.testcontainers.core
     e2eTestImplementation libs.testcontainers.junit
     e2eTestImplementation libs.testcontainers.cassandra
-    e2eTestImplementation libs.testcontainers.core
 
+    e2eTestImplementation libs.testcontainers.redis
     implementation libs.jackson.databind
+
+    implementation libs.lettuce
 }
 
 application {

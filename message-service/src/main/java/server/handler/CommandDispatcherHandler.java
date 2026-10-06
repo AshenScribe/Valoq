@@ -58,6 +58,17 @@ public class CommandDispatcherHandler extends SimpleChannelInboundHandler<Envelo
     private CompletableFuture<?> lastRouteFuture = CompletableFuture.completedFuture(null);
 
     public CommandDispatcherHandler(
+            ConnectionTracker connectionTracker,
+            MessageRouter messageRouter,
+            UserEventRepository userEventRepository,
+            EventRepository eventRepository) {
+        this.connectionTracker = connectionTracker;
+        this.messageRouter = messageRouter;
+        this.userEventRepository = userEventRepository;
+        this.eventRepository = eventRepository;
+    }
+
+    public CommandDispatcherHandler(
             ConnectionTracker connectionTracker, MessageRouter messageRouter) {
         this.connectionTracker = connectionTracker;
         this.messageRouter = messageRouter;
@@ -167,6 +178,16 @@ public class CommandDispatcherHandler extends SimpleChannelInboundHandler<Envelo
                                                 BinaryMessages.createAckResponse(
                                                         streamId, persistedEventId, ctx.alloc());
                                         ctx.writeAndFlush(ack);
+                                    })
+                            .exceptionally(
+                                    ex -> {
+                                        Envelope err =
+                                                BinaryMessages.createErrorResponse(
+                                                        streamId,
+                                                        "ERROR routing failed",
+                                                        ctx.alloc());
+                                        ctx.writeAndFlush(err);
+                                        return null;
                                     })
                             .whenComplete(
                                     (_, _) -> {

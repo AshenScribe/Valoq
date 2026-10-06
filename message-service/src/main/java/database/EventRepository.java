@@ -41,6 +41,7 @@ public class EventRepository {
     private final CqlSession session;
     private final PreparedStatement insertStatement;
     private final PreparedStatement selectStatement;
+    private final PreparedStatement getEventStatement;
 
     public EventRepository() {
         this(CassandraManager.getSession());
@@ -48,6 +49,15 @@ public class EventRepository {
 
     public EventRepository(CqlSession session) {
         this.session = session;
+        SimpleStatement getEventSimple =
+                SimpleStatement.newInstance(
+                                "SELECT * FROM events "
+                                        + "WHERE conversation_id = ? "
+                                        + "AND time_bucket = ? "
+                                        + "AND hash_bucket = ? "
+                                        + "AND event_id = ?")
+                        .setIdempotent(true);
+
         SimpleStatement insertSimple =
                 SimpleStatement.newInstance(
                                 "INSERT INTO events (conversation_id, time_bucket, hash_bucket, event_id, event_type, actor_id, entity_id, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
@@ -60,6 +70,7 @@ public class EventRepository {
 
         this.insertStatement = session.prepare(insertSimple);
         this.selectStatement = session.prepare(selectSimple);
+        this.getEventStatement = session.prepare(getEventSimple);
     }
 
     public CompletionStage<AsyncResultSet> saveEvent(
@@ -82,6 +93,34 @@ public class EventRepository {
                         actorId,
                         entityId,
                         payload));
+    }
+
+    public CompletionStage<Optional<Event>> getEvent(
+            UUID conversationId, String timeBucket, int hashBucket, UUID eventId) {
+
+        return session.executeAsync(
+                        getEventStatement.bind(conversationId, timeBucket, hashBucket, eventId))
+                .thenApply(
+                        result -> {
+                            Row row = result.one();
+
+                            if (row == null) {
+                                return Optional.empty();
+                            }
+
+                            UUID extractedEventId = row.getUuid("event_id");
+                            Instant timestamp =
+                                    Instant.ofEpochMilli(Uuids.unixTimestamp(extractedEventId));
+
+                            return Optional.of(
+                                    new Event(
+                                            row.getUuid("actor_id"),
+                                            row.getUuid("conversation_id"),
+                                            extractedEventId,
+                                            EventType.valueOf(row.getString("event_type")),
+                                            row.getString("payload"),
+                                            timestamp));
+                        });
     }
 
     public CompletionStage<Optional<Event>> getEvents(

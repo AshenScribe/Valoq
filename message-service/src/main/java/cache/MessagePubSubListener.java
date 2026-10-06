@@ -21,53 +21,19 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package config;
+package cache;
 
-import org.aeonbits.owner.Config;
+import io.lettuce.core.pubsub.RedisPubSubAdapter;
+import server.ConnectionTracker;
 
-@Config.Sources({"system:env", "classpath:message-service.properties"})
-public interface ServerConfig extends Config {
+public final class MessagePubSubListener extends RedisPubSubAdapter<String, String> {
 
-    @Key("PORT")
-    @DefaultValue("8002")
-    int serverPort();
+    private final ConnectionTracker connectionTracker;
 
-    @Key("AUTH_HOST")
-    @DefaultValue("localhost")
-    String authHost();
+    public MessagePubSubListener(ConnectionTracker connectionTracker) {
+        this.connectionTracker = connectionTracker;
+    }
 
-    @Key("AUTH_PORT")
-    @DefaultValue("8081")
-    int authPort();
-
-    @Key("DB_HOST")
-    @DefaultValue("localhost")
-    String databaseHost();
-
-    @Key("DB_PORT")
-    @DefaultValue("9042")
-    int databasePort();
-
-    @Key("DB_KEYSPACE")
-    @DefaultValue("valoq_messages")
-    String databaseKeyspace();
-
-    @Key("DB_LOCAL_DATACENTER")
-    @DefaultValue("datacenter1")
-    String databaseLocalDatacenter();
-
-    @Key("DB_USER")
-    @DefaultValue("valoq_message_service")
-    String databaseUsername();
-
-    @Key("DB_PASSWORD")
-    @DefaultValue("message_service_password")
-    String databasePassword();
-
-    @Key("DB_SSL_ENABLED")
-    @DefaultValue("true")
-    boolean databaseSslEnabled();
-
-    @Key("NODE_ID")
-    String nodeId();
+    @Override
+    public void message(String channel, String message) {}
 }

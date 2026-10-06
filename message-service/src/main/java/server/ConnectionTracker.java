@@ -23,13 +23,13 @@
  */
 package server;
 
+import cache.RedisRepository;
 import io.netty.channel.Channel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -41,13 +41,21 @@ public class ConnectionTracker {
 
     private final ChannelGroup allChannels;
     private final ConcurrentHashMap<UUID, Set<Channel>> userChannels = new ConcurrentHashMap<>();
+    private final RedisRepository redisRepository;
+    private final String nodeId;
 
-    public ConnectionTracker() {
-        this(new DefaultChannelGroup("all-client-connections", GlobalEventExecutor.INSTANCE));
+    public ConnectionTracker(String nodeId) {
+        this(
+                new DefaultChannelGroup("all-client-connections", GlobalEventExecutor.INSTANCE),
+                new RedisRepository(),
+                nodeId);
     }
 
-    public ConnectionTracker(ChannelGroup channelGroup) {
+    public ConnectionTracker(
+            ChannelGroup channelGroup, RedisRepository redisRepository, String nodeId) {
         this.allChannels = channelGroup;
+        this.redisRepository = redisRepository;
+        this.nodeId = nodeId;
     }
 
     public ClientConnection track(Channel channel) {
@@ -74,10 +82,7 @@ public class ConnectionTracker {
         if (session != null) {
             session.setUserId(userId);
         }
-    }
-
-    public void register(String userId, Channel channel) {
-        register(UUID.fromString(userId), channel);
+        redisRepository.write("user_presence:" + userId, nodeId);
     }
 
     public boolean unregister(UUID userId, Channel channel) {
@@ -91,61 +96,11 @@ public class ConnectionTracker {
             boolean removed = channels.remove(channel);
             if (channels.isEmpty()) {
                 userChannels.remove(userId);
+                redisRepository.delete(userId.toString());
             }
             return removed;
         }
         return false;
-    }
-
-    public boolean unregister(String userId, Channel channel) {
-        if (userId == null) {
-            return false;
-        }
-        return unregister(UUID.fromString(userId), channel);
-    }
-
-    /** Dispatches a message to a single user's devices with immediate flush. */
-    public int sendToUser(UUID userId, String message) {
-        Set<Channel> channels = userChannels.get(userId);
-        if (channels == null || channels.isEmpty()) {
-            return 0;
-        }
-
-        int delivered = 0;
-        for (Channel ch : channels) {
-            if (ch.isActive()) {
-                ch.writeAndFlush(message);
-                delivered++;
-            }
-        }
-        return delivered;
-    }
-
-    /**
-     * High-performance Cassandra-inspired fanout: Queues writes across all recipient channels and
-     * issues flush calls efficiently, avoiding syscall thrashing on large recipient lists.
-     */
-    public int broadcastToUsers(Collection<UUID> userIds, String message) {
-        List<Channel> channelsToFlush = new ArrayList<>();
-
-        for (UUID userId : userIds) {
-            Set<Channel> channels = userChannels.get(userId);
-            if (channels != null) {
-                for (Channel ch : channels) {
-                    if (ch.isActive()) {
-                        ch.write(message); // Write to buffer without immediate kernel syscall
-                        channelsToFlush.add(ch);
-                    }
-                }
-            }
-        }
-
-        // Flush each active channel once
-        for (Channel ch : channelsToFlush) {
-            ch.flush();
-        }
-
-        return channelsToFlush.size();
     }
 
     public Channel get(UUID userId) {
@@ -161,35 +116,9 @@ public class ConnectionTracker {
         return null;
     }
 
-    public Channel get(String userId) {
-        try {
-            return get(UUID.fromString(userId));
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
-    public Set<Channel> getAllChannelsForUser(UUID userId) {
-        Set<Channel> channels = userChannels.get(userId);
-        return channels == null ? Collections.emptySet() : Collections.unmodifiableSet(channels);
-    }
-
     public void closeAll() {
         allChannels.close().awaitUninterruptibly();
         userChannels.clear();
-    }
-
-    public boolean isUserOnline(UUID userId) {
-        Set<Channel> channels = userChannels.get(userId);
-        return channels != null && channels.stream().anyMatch(Channel::isActive);
-    }
-
-    public int getConnectedUserCount() {
-        return userChannels.size();
-    }
-
-    public int getTotalChannelCount() {
-        return allChannels.size();
     }
 
     public int getSize() {
@@ -230,23 +159,35 @@ public class ConnectionTracker {
 
     public int sendToUser(UUID userId, Envelope envelope) {
         Set<Channel> channels = userChannels.get(userId);
-        if (channels == null || channels.isEmpty()) {
-            envelope.release();
+        if (channels != null && !channels.isEmpty()) {
+            int delivered = 0;
+            try {
+                for (Channel ch : channels) {
+                    if (ch.isActive()) {
+                        ch.writeAndFlush(envelope.duplicate());
+                        delivered++;
+                    }
+                }
+            } finally {
+                envelope.release();
+            }
+            return delivered;
+        } else {
+            redisRepository
+                    .read("user_presence:" + userId)
+                    .thenAccept(
+                            targetNodeId -> {
+                                try {
+                                    if (targetNodeId != null) {
+                                        redisRepository.publish(
+                                                "node:" + targetNodeId, envelope.toString());
+                                    }
+                                } finally {
+                                    envelope.release();
+                                }
+                            });
             return 0;
         }
-
-        int delivered = 0;
-        try {
-            for (Channel ch : channels) {
-                if (ch.isActive()) {
-                    ch.writeAndFlush(envelope.duplicate());
-                    delivered++;
-                }
-            }
-        } finally {
-            envelope.release();
-        }
-        return delivered;
     }
 
     public void broadcastNotice(String noticeMessage) {

@@ -23,6 +23,8 @@
  */
 package server;
 
+import cache.MessagePubSubListener;
+import cache.RedisManager;
 import config.ServerConfig;
 import database.CassandraManager;
 import io.netty.bootstrap.ServerBootstrap;
@@ -60,7 +62,7 @@ public class MessageServer {
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
 
-    private final ConnectionTracker connectionTracker = new ConnectionTracker();
+    private final ConnectionTracker connectionTracker;
 
     private final IoHandlerFactory factory =
             Epoll.isAvailable() ? EpollIoHandler.newFactory() : NioIoHandler.newFactory();
@@ -70,6 +72,7 @@ public class MessageServer {
 
     public MessageServer(ServerConfig serverConfig) {
         this.port = serverConfig.serverPort();
+        this.connectionTracker = new ConnectionTracker(serverConfig.nodeId());
     }
 
     public synchronized void start() throws InterruptedException {
@@ -82,7 +85,7 @@ public class MessageServer {
                         .channel(channelClass)
                         .childOption(ChannelOption.SO_KEEPALIVE, true)
                         .childHandler(new MessageServerInitializer(connectionTracker));
-
+        RedisManager.getInstance().addPubSubListener(new MessagePubSubListener(connectionTracker));
         serverChannel = bootstrap.bind(port).sync().channel();
         LOGGER.info("MessageServer started on port {}", getPort());
     }
@@ -101,6 +104,7 @@ public class MessageServer {
             workerGroup.shutdownGracefully(100, 2000, TimeUnit.MILLISECONDS).syncUninterruptibly();
         }
         CassandraManager.close();
+        RedisManager.getInstance().close();
         LOGGER.info("MessageServer stopped cleanly.");
     }
 

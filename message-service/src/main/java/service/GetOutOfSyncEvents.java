@@ -78,7 +78,7 @@ public class GetOutOfSyncEvents implements Service<CompletionStage<List<Event>>>
                                 String eventBucket = BucketUtils.toTimeBucket(eventTime);
 
                                 futures.add(
-                                        eventRepository.getEvents(
+                                        eventRepository.getEvent(
                                                 conversationId, eventBucket, 0, eventId));
                             }
 

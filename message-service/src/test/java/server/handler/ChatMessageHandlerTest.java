@@ -62,6 +62,7 @@ class ChatMessageHandlerTest {
     private static final String CREATED_AT = "2026-09-30T17:30:00Z";
     private static final UUID ALICE_USER_ID = UUID.randomUUID();
     private static final UUID BOB_USER_ID = UUID.randomUUID();
+    private static final String NODE_ID = "node_Id_random";
 
     private EmbeddedChannel senderChannel;
     private ConnectionTracker connectionTracker;
@@ -72,7 +73,7 @@ class ChatMessageHandlerTest {
 
     @BeforeEach
     void setup() {
-        connectionTracker = new ConnectionTracker();
+        connectionTracker = new ConnectionTracker(NODE_ID);
 
         eventRepository = mock(EventRepository.class);
         memberRepository = mock(ConversationMemberRepository.class);

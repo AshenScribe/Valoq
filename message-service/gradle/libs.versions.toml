@@ -3,11 +3,13 @@ cassandra-driver = "4.19.3"
 groovy = "3.0.5"
 jackson-databind = "2.22.2"
 junit = "5.7.1"
+lettuce = "7.8.0.RELEASE"
 mockito = "5.24.0"
 netty = "4.2.18.Final"
 slf4j = "2.0.19"
 owner = "1.0.12"
-testcontainer = "2.0.5"
+testcontainers = "2.0.5"
+testcontainers-redis = "2.2.4"
 
 [libraries]
 cassandra-driver = { module = "org.apache.cassandra:java-driver-core", version.ref = "cassandra-driver" }
@@ -20,7 +22,11 @@ junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.re
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit" }
+
+lettuce = { module = "io.lettuce:lettuce-core", version.ref = "lettuce" }
+
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+
 netty-bom = { module = "io.netty:netty-bom", version.ref = "netty" }
 netty-buffer = { module = "io.netty:netty-buffer" }
 netty-handler = { module = "io.netty:netty-handler" }
@@ -34,9 +40,11 @@ slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 
 owner = { module = "org.aeonbits.owner:owner", version.ref = "owner" }
 
-testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainer" }
-testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainer" }
-testcontainers-cassandra = { module = "org.testcontainers:testcontainers-cassandra", version.ref = "testcontainer" }
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+testcontainers-core = { module = "org.testcontainers:testcontainers" }
+testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+testcontainers-cassandra = { module = "org.testcontainers:testcontainers-cassandra" }
+testcontainers-redis = { module = "com.redis:testcontainers-redis", version.ref = "testcontainers-redis" }
 
 [bundles]
 testing-suite = ["groovy-core", "junit-jupiter-api", "junit-jupiter-engine", "junit-jupiter-params"]
