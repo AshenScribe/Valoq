@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import protocol.BinaryMessages;
 import protocol.Envelope;
+import server.model.RoutedMessage;
 
 public class ConnectionTracker {
 
@@ -179,8 +180,10 @@ public class ConnectionTracker {
                             targetNodeId -> {
                                 try {
                                     if (targetNodeId != null) {
+                                        RoutedMessage routedMessage =
+                                                new RoutedMessage(userId, envelope);
                                         redisRepository.publish(
-                                                "node:" + targetNodeId, envelope.toString());
+                                                "node:" + targetNodeId, routedMessage.toJson());
                                     }
                                 } finally {
                                     envelope.release();

@@ -23,6 +23,9 @@
  */
 package protocol;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 public enum Opcode {
     ERROR((byte) 0x00),
     INIT((byte) 0x01),
@@ -55,6 +58,7 @@ public enum Opcode {
         this.code = code;
     }
 
+    @JsonCreator
     public static Opcode fromByte(byte b) {
         if (b < 0 || b >= LOOKUP.length || LOOKUP[b] == null) {
             throw new IllegalArgumentException("Unknown opcode: " + b);
@@ -62,6 +66,7 @@ public enum Opcode {
         return LOOKUP[b];
     }
 
+    @JsonValue
     public byte getCode() {
         return code;
     }

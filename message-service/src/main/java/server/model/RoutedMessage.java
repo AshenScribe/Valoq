@@ -21,23 +21,26 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package cache;
+package server.model;
 
-import io.lettuce.core.pubsub.RedisPubSubAdapter;
-import server.ConnectionTracker;
-import server.model.RoutedMessage;
+import java.util.UUID;
+import protocol.Envelope;
 
-public final class MessagePubSubListener extends RedisPubSubAdapter<String, String> {
+public record RoutedMessage(UUID userId, Envelope envelope) {
 
-    private final ConnectionTracker connectionTracker;
-
-    public MessagePubSubListener(ConnectionTracker connectionTracker) {
-        this.connectionTracker = connectionTracker;
+    public String toJson() {
+        try {
+            return Envelope.getMapper().writeValueAsString(this);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to serialize RoutedMessage", e);
+        }
     }
 
-    @Override
-    public void message(String channel, String message) {
-        RoutedMessage routedMessage = RoutedMessage.fromJson(message);
-        connectionTracker.sendToUser(routedMessage.userId(), routedMessage.envelope());
+    public static RoutedMessage fromJson(String json) {
+        try {
+            return Envelope.getMapper().readValue(json, RoutedMessage.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to deserialize RoutedMessage", e);
+        }
     }
 }
