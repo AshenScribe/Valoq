@@ -55,6 +55,16 @@ services:
       echo 'Cassandra is ready. Running initialization script...' &&
       cqlsh cassandra 9042 -u cassandra -p cassandra -f /init.cql"
 
+  redis:
+    image: redis:8.3.3
+    container_name: valoq-redis
+    healthcheck:
+          test: ["CMD", "redis-cli", "ping"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+          start_period: 40s
+
   auth-service:
     build:
       context: ./auth-service
@@ -103,3 +113,5 @@ services:
         condition: service_completed_successfully
       auth-service:
         condition: service_started
+      redis:
+        condition: service_completed_successfully
