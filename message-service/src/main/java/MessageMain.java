@@ -21,6 +21,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+import cache.RedisManager;
+import config.CacheConfig;
 import config.ConfigLoader;
 import config.ServerConfig;
 import database.CassandraManager;
@@ -37,6 +39,8 @@ public final class MessageMain {
         PublicKeyClient publicKeyClient = new PublicKeyClient(config.authHost(), config.authPort());
         String publicKey = publicKeyClient.getPublicKey();
         JwtUtil.getInstance().init(publicKey);
+        CacheConfig cacheConfig = new CacheConfig(config.redisHost(), config.redisPort(), 5, config.redisDatabase(), config.redisUsername(), config.redisPassword());
+        RedisManager.getInstance(cacheConfig);
         MessageServer server = new MessageServer(config);
         CassandraManager.init(config);
         try {

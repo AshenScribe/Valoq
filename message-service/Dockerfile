@@ -22,7 +22,6 @@ RUN --mount=type=cache,target=${GRADLE_USER_HOME} \
     ./gradlew dependencies --no-daemon --console=plain
 
 COPY src ./src
-COPY LICENSE_HEADER .
 
 # Replace 'build' with 'installDist'
 RUN --mount=type=cache,target=${GRADLE_USER_HOME} \

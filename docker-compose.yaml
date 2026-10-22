@@ -38,6 +38,20 @@ services:
       retries: 10
       start_period: 60s
 
+  redis:
+      image: redis:8.8.3
+      container_name: valoq-redis
+      ports:
+        - "6379:6379"
+      volumes:
+        - ./script/redis.conf:/usr/local/etc/redis/redis.conf
+      command: ["redis-server", "--protected-mode", "no", "--user", "valoq", "on", ">valoq", "~*", "&*", "+@all"]
+      healthcheck:
+        test: ["CMD", "redis-cli", "--user", "valoq", "-a", "valoq_redis_password", "ping"]
+        interval: 30s
+        timeout: 5s
+        retries: 3
+
   cassandra-init:
     image: cassandra:5.0
     container_name: valoq-cassandra-init
@@ -97,9 +111,17 @@ services:
       DB_SSL_ENABLED: false
       AUTH_HOST: auth-service
       AUTH_PORT: 8081
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USERNAME: valoq
+      REDIS_PASSWORD: valoq
+      REDIS_DATABASE: 0
+
     restart: on-failure
     depends_on:
       cassandra-init:
         condition: service_completed_successfully
       auth-service:
+        condition: service_started
+      redis:
         condition: service_started

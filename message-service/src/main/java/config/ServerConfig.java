@@ -70,4 +70,19 @@ public interface ServerConfig extends Config {
 
     @Key("NODE_ID")
     String nodeId();
+
+    @Key("REDIS_HOST")
+    String redisHost();
+
+    @Key("REDIS_PORT")
+    int redisPort();
+
+    @Key("REDIS_DATABASE")
+    int redisDatabase();
+
+    @Key("REDIS_USERNAME")
+    String redisUsername();
+
+    @Key("REDIS_PASSWORD")
+    String redisPassword();
 }
