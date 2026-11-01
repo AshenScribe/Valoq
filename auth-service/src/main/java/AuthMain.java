@@ -26,24 +26,36 @@ import config.ConfigLoader;
 import config.ServerConfig;
 import database.DatabaseManager;
 import server.AuthServer;
+import tracer.Telemetry;
 
 public final class AuthMain {
 
     private AuthMain() {}
 
     public static void main(String[] args) throws InterruptedException {
+        Telemetry telemetry = Telemetry.initialize();
+
         ServerConfig appConfig = new ConfigLoader().appConfig();
         DatabaseManager.init(appConfig);
         JwtUtil.getInstance(appConfig.jwt().expirationSeconds());
+
         AuthServer server = new AuthServer(appConfig);
 
         Runtime.getRuntime()
                 .addShutdownHook(
                         new Thread(
                                 () -> {
-                                    server.stop();
-                                    DatabaseManager.close();
-                                }));
+                                    try {
+                                        server.stop();
+                                    } finally {
+                                        try {
+                                            DatabaseManager.close();
+                                        } finally {
+                                            telemetry.close();
+                                        }
+                                    }
+                                },
+                                "auth-shutdown"));
 
         server.start();
     }

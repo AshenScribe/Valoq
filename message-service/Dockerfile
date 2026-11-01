@@ -38,10 +38,10 @@ FROM eclipse-temurin:25-jre-jammy AS runtime
 
 WORKDIR /app
 
+ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar /opt/opentelemetry-javaagent.jar
 COPY --from=builder /app/build/install/message-service /app
 
 EXPOSE 8082
-
-ENV JAVA_OPTS="-XX:+UseZGC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
+ENV JAVA_OPTS="-javaagent:/opt/opentelemetry-javaagent.jar -XX:+UseZGC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
 
 ENTRYPOINT ["/app/bin/message-service"]

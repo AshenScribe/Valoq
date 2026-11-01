@@ -69,6 +69,16 @@ services:
       echo 'Cassandra is ready. Running initialization script...' &&
       cqlsh cassandra 9042 -u cassandra -p cassandra -f /init.cql"
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib
+    container_name: otel-collector
+    command: [ "--config=/etc/otel-config.yaml" ]
+    volumes:
+      - ./otel-config.yaml:/etc/otel-config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
   auth-service:
     build:
       context: ./auth-service
@@ -77,6 +87,11 @@ services:
     ports:
       - "8081:8081"
     environment:
+      OTEL_SERVICE_NAME: "auth-service"
+      OTEL_TRACES_EXPORTER: "console"
+      OTEL_METRICS_EXPORTER: "console"
+      OTEL_LOGS_EXPORTER: "console"
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: valoq
@@ -87,6 +102,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "printf 'PING\n' | nc localhost 8081 | grep -q 'OK' || exit 1"]
       interval: 3s
@@ -101,6 +118,11 @@ services:
     ports:
       - "8082:8082"
     environment:
+      OTEL_SERVICE_NAME: "message-service"
+      OTEL_TRACES_EXPORTER: "console"
+      OTEL_METRICS_EXPORTER: "console"
+      OTEL_LOGS_EXPORTER: "console"
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
       DB_HOST: cassandra
       DB_PORT: 9042
       DB_KEYSPACE: valoq_messages
