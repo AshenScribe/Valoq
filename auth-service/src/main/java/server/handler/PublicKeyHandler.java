@@ -27,10 +27,7 @@ import authenticator.jwt.KeyProvider;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.StatusCode;
 import java.util.Base64;
-import tracer.Tracing;
 
 @ChannelHandler.Sharable
 public final class PublicKeyHandler extends SimpleChannelInboundHandler<String> {
@@ -46,20 +43,9 @@ public final class PublicKeyHandler extends SimpleChannelInboundHandler<String> 
             return;
         }
 
-        Span span = Tracing.startServerSpan("auth.public_key");
-
-        try {
-            String publicKey =
-                    Base64.getEncoder()
-                            .encodeToString(KeyProvider.getInstance().getPublicKey().getEncoded());
-
-            ctx.writeAndFlush(publicKey);
-        } catch (RuntimeException | Error e) {
-            span.recordException(e);
-            span.setStatus(StatusCode.ERROR);
-            throw e;
-        } finally {
-            span.end();
-        }
+        String publicKey =
+                Base64.getEncoder()
+                        .encodeToString(KeyProvider.getInstance().getPublicKey().getEncoded());
+        ctx.writeAndFlush(publicKey);
     }
 }

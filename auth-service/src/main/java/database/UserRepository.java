@@ -24,6 +24,11 @@
 package database;
 
 import database.entity.UserEntity;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -32,6 +37,8 @@ import java.util.UUID;
 
 public class UserRepository {
 
+    private static final Tracer TRACER =
+            GlobalOpenTelemetry.getTracer("valoq.auth-service.database");
     private final Connection connection;
     private static final String AUTH_QUERY = "SELECT * FROM users WHERE username = ?";
     private static final String INSERT_USER_QUERY =
@@ -46,6 +53,13 @@ public class UserRepository {
     }
 
     public UserEntity getUser(String username) {
+        Span span =
+                TRACER.spanBuilder("db.users.select")
+                        .setSpanKind(SpanKind.CLIENT)
+                        .setAttribute("db.system", "postgresql")
+                        .setAttribute("db.operation", "SELECT")
+                        .setAttribute("db.query.summary", AUTH_QUERY)
+                        .startSpan();
         boolean shouldClose = (this.connection == null);
         Connection conn = null;
         try {
@@ -59,12 +73,15 @@ public class UserRepository {
                         final String dbUsername = resultSet.getString("username");
                         final String salt = resultSet.getString("salt");
                         final String email = resultSet.getString("email");
+                        span.setAttribute("user.id", id);
                         return new UserEntity(id, dbUsername, passwordHash, salt, email);
                     }
                 }
             }
             return null;
         } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR);
             throw new RuntimeException(e);
         } finally {
             if (shouldClose && conn != null) {
@@ -73,6 +90,7 @@ public class UserRepository {
                 } catch (SQLException ignored) {
                 }
             }
+            span.end();
         }
     }
 
@@ -82,6 +100,14 @@ public class UserRepository {
 
     public String saveUser(String username, String password, String salt, String email) {
         String userId = "usr_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        Span span =
+                TRACER.spanBuilder("db.users.insert")
+                        .setSpanKind(SpanKind.CLIENT)
+                        .setAttribute("db.system", "postgresql")
+                        .setAttribute("db.operation", "INSERT")
+                        .setAttribute("db.query.summary", INSERT_USER_QUERY)
+                        .setAttribute("user.id", userId)
+                        .startSpan();
         boolean shouldClose = (this.connection == null);
         Connection conn = null;
         try {
@@ -96,7 +122,9 @@ public class UserRepository {
             }
             return userId;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to save user: " + username, e);
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR);
+            throw new RuntimeException("Failed to save user", e);
         } finally {
             if (shouldClose && conn != null) {
                 try {
@@ -104,6 +132,7 @@ public class UserRepository {
                 } catch (SQLException ignored) {
                 }
             }
+            span.end();
         }
     }
 }

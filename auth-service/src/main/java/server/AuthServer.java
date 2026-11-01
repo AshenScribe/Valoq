@@ -53,6 +53,7 @@ import server.handler.HealthHandler;
 import server.handler.IdleConnectionReaperHandler;
 import server.handler.InboundExceptionHandler;
 import server.handler.PublicKeyHandler;
+import server.handler.TracingMetadataHandler;
 
 public class AuthServer {
     private final int port;
@@ -140,6 +141,7 @@ public class AuthServer {
         @Override
         protected void initChannel(SocketChannel ch) {
             ch.pipeline().addFirst("connectionLimitHandler", connectionLimitHandler);
+            ch.pipeline().addFirst("tracingMetadataHandler", TracingMetadataHandler.INSTANCE);
             if (idleTimeoutSeconds > 0) {
                 ch.pipeline()
                         .addLast(

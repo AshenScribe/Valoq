@@ -33,6 +33,8 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.CorruptedFrameException;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.TooLongFrameException;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
 import java.io.IOException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -58,6 +60,11 @@ public final class InboundExceptionHandler extends ChannelInboundHandlerAdapter 
         }
 
         Throwable root = unwrap(cause);
+        Span rootSpan = ctx.channel().attr(TracingMetadataHandler.ROOT_SPAN).get();
+        if (rootSpan != null) {
+            rootSpan.recordException(root);
+            rootSpan.setStatus(StatusCode.ERROR);
+        }
         if (root instanceof IOException) {
             LOGGER.debug(
                     "Client abruptly closed connection: {} ({})",

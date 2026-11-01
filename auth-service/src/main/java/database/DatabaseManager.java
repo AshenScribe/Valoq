@@ -26,11 +26,18 @@ package database;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import config.ServerConfig;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
 import java.sql.Connection;
 import java.sql.SQLException;
 
 public final class DatabaseManager {
 
+    private static final Tracer TRACER =
+            GlobalOpenTelemetry.getTracer("valoq.auth-service.database");
     private static volatile HikariDataSource dataSource;
 
     private DatabaseManager() {}
@@ -76,12 +83,26 @@ public final class DatabaseManager {
     }
 
     public static Connection getConnection() throws SQLException {
+        Span span =
+                TRACER.spanBuilder("db.connection.acquire")
+                        .setSpanKind(SpanKind.CLIENT)
+                        .setAttribute("db.system", "postgresql")
+                        .setAttribute("db.operation", "acquire")
+                        .startSpan();
         HikariDataSource ds = dataSource;
-        if (ds == null || ds.isClosed()) {
-            throw new IllegalStateException(
-                    "DatabaseManager is not initialized or pool is closed.");
+        try {
+            if (ds == null || ds.isClosed()) {
+                throw new IllegalStateException(
+                        "DatabaseManager is not initialized or pool is closed.");
+            }
+            return ds.getConnection();
+        } catch (RuntimeException | SQLException e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR);
+            throw e;
+        } finally {
+            span.end();
         }
-        return ds.getConnection();
     }
 
     public static synchronized void close() {

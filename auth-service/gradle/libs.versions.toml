@@ -71,9 +71,7 @@ netty = [
 otel = [
     "opentelemetry-api",
     "opentelemetry-sdk",
-    "opentelemetry-exporter-otlp",
-    "otel-netty",
-    "otel-jdbc"
+    "opentelemetry-exporter-otlp"
 ]
 
 slf4j = [

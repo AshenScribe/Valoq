@@ -26,14 +26,13 @@ package server.handler;
 import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
-import io.opentelemetry.context.Scope;
-import io.netty.channel.SimpleChannelInboundHandler;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -54,13 +53,13 @@ public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthComma
 
     // Dedicated worker executor for CPU/DB auth tasks (lazily initialized /
     // recreated on demand)
-    private static volatile ExecutorService authWorkers = Executors.newVirtualThreadPerTaskExecutor();
+    private static volatile ExecutorService authWorkers =
+            Executors.newVirtualThreadPerTaskExecutor();
 
     // Sized to match database pool capacity (HikariCP max 10)
     private static final Semaphore DB_CONCURRENCY_GATE = new Semaphore(10);
 
-    public AuthenticationHandler() {
-    }
+    public AuthenticationHandler() {}
 
     private static ExecutorService getWorkers() {
         ExecutorService workers = authWorkers;
@@ -84,71 +83,74 @@ public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthComma
         }
 
         Context parentContext = Context.current();
-        Span span = TRACER.spanBuilder("auth.authenticate")
-                .setParent(parentContext)
-                .setSpanKind(SpanKind.SERVER)
-                .startSpan();
+        Span span =
+                TRACER.spanBuilder("auth.authenticate")
+                        .setParent(parentContext)
+                        .setSpanKind(SpanKind.SERVER)
+                        .startSpan();
 
         Context authContext = parentContext.with(span);
 
         try {
             CompletableFuture.supplyAsync(
-                    () -> {
-                        try (Scope scope = authContext.makeCurrent()) {
-                            boolean acquired = false;
+                            () -> {
+                                try (var scope = TracingMetadataHandler.makeCurrent(authContext)) {
+                                    boolean acquired = false;
 
-                            try {
-                                acquired = DB_CONCURRENCY_GATE.tryAcquire(
-                                        2, TimeUnit.SECONDS);
+                                    try {
+                                        acquired =
+                                                DB_CONCURRENCY_GATE.tryAcquire(2, TimeUnit.SECONDS);
 
-                                if (!acquired) {
-                                    throw new IllegalStateException(
-                                            "Server overloaded, please retry later");
+                                        if (!acquired) {
+                                            throw new IllegalStateException(
+                                                    "Server overloaded, please retry later");
+                                        }
+
+                                        if (!ctx.channel().isActive()) {
+                                            LOGGER.debug(
+                                                    "Client disconnected before auth execution started; "
+                                                            + "discarding task");
+                                            return null;
+                                        }
+
+                                        return AuthenticationHandlerFactory
+                                                .getAuthenticationHandler(msg)
+                                                .login(msg);
+                                    } catch (InterruptedException e) {
+                                        Thread.currentThread().interrupt();
+                                        throw new RuntimeException(
+                                                "Authentication task interrupted", e);
+                                    } finally {
+                                        if (acquired) {
+                                            DB_CONCURRENCY_GATE.release();
+                                        }
+                                    }
                                 }
+                            },
+                            Context.taskWrapping(getWorkers()))
+                    .whenComplete(
+                            authContext.wrapConsumer(
+                                    (token, ex) -> {
+                                        try (var scope =
+                                                TracingMetadataHandler.makeCurrent(authContext)) {
+                                            if (ex != null) {
+                                                Throwable error = ex;
+                                                while ((error instanceof CompletionException
+                                                                || error
+                                                                        instanceof
+                                                                        ExecutionException)
+                                                        && error.getCause() != null) {
+                                                    error = error.getCause();
+                                                }
 
-                                if (!ctx.channel().isActive()) {
-                                    LOGGER.debug(
-                                            "Client disconnected before auth execution started; "
-                                                    + "discarding task");
-                                    return null;
-                                }
-
-                                return AuthenticationHandlerFactory
-                                        .getAuthenticationHandler(msg)
-                                        .login(msg);
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                                throw new RuntimeException(
-                                        "Authentication task interrupted", e);
-                            } finally {
-                                if (acquired) {
-                                    DB_CONCURRENCY_GATE.release();
-                                }
-                            }
-                        }
-                    },
-                    getWorkers())
-                    .whenComplete((token, ex) -> {
-                        try {
-                            if (ex != null) {
-                                Throwable error = ex;
-                                while ((error instanceof CompletionException
-                                        || error instanceof ExecutionException)
-                                        && error.getCause() != null) {
-                                    error = error.getCause();
-                                }
-
-                                span.recordException(error);
-                                span.setStatus(StatusCode.ERROR);
-                            }
-                        } finally {
-                            span.end();
-                        }
-
-                    });
-        } catch (
-
-        Throwable t) {
+                                                span.recordException(error);
+                                                span.setStatus(StatusCode.ERROR);
+                                            }
+                                        } finally {
+                                            span.end();
+                                        }
+                                    }));
+        } catch (Throwable t) {
             try {
                 span.recordException(t);
                 span.setStatus(StatusCode.ERROR);

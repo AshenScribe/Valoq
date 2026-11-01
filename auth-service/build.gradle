@@ -34,7 +34,6 @@ dependencies {
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${libs.versions.junit.get()}"
     testRuntimeOnly libs.junit.platform.launcher
 
-    implementation platform(libs.opentelemetry.instrumentation.bom.alpha)
     implementation libs.bundles.otel
 
     implementation libs.jjwt.api
