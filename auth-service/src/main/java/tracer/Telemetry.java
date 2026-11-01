@@ -27,7 +27,13 @@ import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.exporter.prometheus.PrometheusHttpServer;
+import io.opentelemetry.instrumentation.runtimemetrics.Cpu;
+import io.opentelemetry.instrumentation.runtimemetrics.GarbageCollector;
+import io.opentelemetry.instrumentation.runtimemetrics.MemoryPools;
+import io.opentelemetry.instrumentation.runtimemetrics.Threads;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.metrics.SdkMeterProvider;
 import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
@@ -64,10 +70,26 @@ public final class Telemetry implements AutoCloseable {
                         .addSpanProcessor(BatchSpanProcessor.builder(exporter).build())
                         .build();
 
+        int prometheusPort =
+                Integer.parseInt(System.getenv().getOrDefault("PROMETHEUS_PORT", "9464"));
+        var prometheusServer = PrometheusHttpServer.builder().setPort(prometheusPort).build();
+        var meterProvider =
+                SdkMeterProvider.builder()
+                        .setResource(resource)
+                        .registerMetricReader(prometheusServer)
+                        .build();
+
         OpenTelemetrySdk sdk =
                 OpenTelemetrySdk.builder()
                         .setTracerProvider(tracerProvider)
+                        .setMeterProvider(meterProvider)
                         .buildAndRegisterGlobal();
+
+        MemoryPools.registerObservers(sdk);
+        GarbageCollector.registerObservers(sdk);
+        Threads.registerObservers(sdk);
+        Cpu.registerObservers(sdk);
+        JvmMetrics.register(sdk);
 
         return new Telemetry(sdk);
     }

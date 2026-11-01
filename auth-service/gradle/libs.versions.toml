@@ -8,9 +8,13 @@ jjwt = "0.13.0"
 junit = "5.7.1"
 netty = "4.2.18.Final"
 opentelemetry = "1.49.0"
+opentelemetry-prometheus = "1.49.0-alpha"
+opentelemetry-runtime-metrics = "1.26.0-alpha"
 owner = "1.0.12"
 postgresql = "42.7.13"
 slf4j = "2.0.19"
+logback = "1.5.18"
+logstash-encoder = "8.1"
 testcontainer = "2.0.5"
 
 [libraries]
@@ -44,6 +48,8 @@ netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll
 opentelemetry-api = { module = "io.opentelemetry:opentelemetry-api", version.ref = "opentelemetry" }
 opentelemetry-sdk = { module = "io.opentelemetry:opentelemetry-sdk", version.ref = "opentelemetry" }
 opentelemetry-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp", version.ref = "opentelemetry" }
+opentelemetry-exporter-prometheus = { module = "io.opentelemetry:opentelemetry-exporter-prometheus", version.ref = "opentelemetry-prometheus" }
+opentelemetry-runtime-metrics = { module = "io.opentelemetry.instrumentation:opentelemetry-runtime-metrics", version.ref = "opentelemetry-runtime-metrics" }
 
 owner = { module = "org.aeonbits.owner:owner", version.ref = "owner" }
 
@@ -55,6 +61,8 @@ testcontainers-postgres = { module = "org.testcontainers:testcontainers-postgres
 
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+logstash-encoder = { module = "net.logstash.logback:logstash-logback-encoder", version.ref = "logstash-encoder" }
 
 [bundles]
 testing-suite = ["groovy-core", "junit-jupiter-api", "junit-jupiter-engine", "junit-jupiter-params"]
@@ -71,10 +79,9 @@ netty = [
 otel = [
     "opentelemetry-api",
     "opentelemetry-sdk",
-    "opentelemetry-exporter-otlp"
+    "opentelemetry-exporter-otlp",
+    "opentelemetry-exporter-prometheus",
+    "opentelemetry-runtime-metrics"
 ]
 
-slf4j = [
-    "slf4j-api",
-    "slf4j-simple"
-]
+slf4j = ["slf4j-api"]

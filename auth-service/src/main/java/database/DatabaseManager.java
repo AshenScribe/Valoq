@@ -33,6 +33,7 @@ import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import java.sql.Connection;
 import java.sql.SQLException;
+import tracer.Metrics;
 
 public final class DatabaseManager {
 
@@ -80,6 +81,7 @@ public final class DatabaseManager {
         hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
 
         dataSource = new HikariDataSource(hikariConfig);
+        HikariMetrics.register(dataSource);
     }
 
     public static Connection getConnection() throws SQLException {
@@ -90,6 +92,7 @@ public final class DatabaseManager {
                         .setAttribute("db.operation", "acquire")
                         .startSpan();
         HikariDataSource ds = dataSource;
+        long startNanos = System.nanoTime();
         try {
             if (ds == null || ds.isClosed()) {
                 throw new IllegalStateException(
@@ -101,6 +104,7 @@ public final class DatabaseManager {
             span.setStatus(StatusCode.ERROR);
             throw e;
         } finally {
+            Metrics.recordHikariAcquireWaitNanos(System.nanoTime() - startNanos);
             span.end();
         }
     }

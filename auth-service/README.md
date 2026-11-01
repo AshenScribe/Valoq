@@ -93,4 +93,37 @@ The service is configured via environment variables or `auth-config.properties`:
 | `DB_USER` | `valoq` | Database username. |
 | `DB_PASSWORD` | `valoq` | Database password. |
 | `JWT_EXPIRATION` | `300` | Issued token lifespan in seconds (default: 5 minutes). |
+| `PROMETHEUS_PORT` | `9464` | Port for the Prometheus `/metrics` endpoint. |
 ```
+
+### Grafana dashboard
+
+The portable Grafana dashboard model is available at
+[`observability/grafana/auth-service-dashboard.json`](observability/grafana/auth-service-dashboard.json).
+It uses the `${datasource}` variable and organizes panels by the Request Lifecycle: health,
+authentication flow, and database performance.
+
+### Complete local observability stack
+
+From the repository root, start the auth-service observability deployment with:
+
+```bash
+docker compose up -d --build auth-service otel-collector prometheus loki alloy tempo grafana
+```
+
+The deployment provides:
+
+| Component | Address | Purpose |
+| :--- | :--- | :--- |
+| Auth protocol | `localhost:8081` | Authentication TCP service |
+| Prometheus metrics | `http://localhost:9464/metrics` | Embedded OTel Prometheus endpoint |
+| Prometheus | `http://localhost:9090` | Metrics scraping and queries |
+| Grafana | `http://localhost:3000` | Dashboards and correlations (`admin` / `admin`) |
+| Loki | `http://localhost:3100` | JSON container log storage |
+| Tempo | `http://localhost:3200` | Trace storage and trace-to-log navigation |
+
+Prometheus scrapes `auth-service:9464`. Grafana data sources and the auth-service dashboard
+are provisioned automatically. Grafana Alloy collects only the auth-service Docker container
+logs, parses the JSON output, and preserves `trace_id` and `span_id` metadata for trace/log
+correlation. The auth-service logs use the existing request-scoped MDC context, so logs emitted
+while a request span is current carry the matching trace identifiers.

@@ -25,6 +25,8 @@ dependencies {
     implementation platform(libs.netty.bom)
     implementation libs.bundles.netty
     implementation libs.bundles.slf4j
+    runtimeOnly libs.logback.classic
+    runtimeOnly libs.logstash.encoder
 
     implementation(variantOf(libs.netty.transport.native.epoll) {
         classifier(epollClassifier)

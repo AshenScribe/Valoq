@@ -78,20 +78,35 @@ services:
     ports:
       - "4317:4317"
       - "4318:4318"
+    depends_on:
+      tempo:
+        condition: service_started
+
+  tempo:
+    image: grafana/tempo:2.7.2
+    container_name: valoq-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"
 
   auth-service:
     build:
       context: ./auth-service
       dockerfile: Dockerfile
     container_name: auth-service
+    restart: unless-stopped
     ports:
       - "8081:8081"
+      - "9464:9464"
     environment:
       OTEL_SERVICE_NAME: "auth-service"
-      OTEL_TRACES_EXPORTER: "console"
-      OTEL_METRICS_EXPORTER: "console"
-      OTEL_LOGS_EXPORTER: "console"
-      OTEL_METRIC_EXPORT_INTERVAL: "15000"
+      OTEL_TRACES_EXPORTER: "otlp"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_LOGS_EXPORTER: "none"
+      PROMETHEUS_PORT: "9464"
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: valoq
@@ -104,11 +119,87 @@ services:
         condition: service_healthy
       otel-collector:
         condition: service_started
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+      alloy:
+        condition: service_started
+      tempo:
+        condition: service_started
+      grafana:
+        condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "printf 'PING\n' | nc localhost 8081 | grep -q 'OK' || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "timeout 3 bash -c 'exec 3<>/dev/tcp/127.0.0.1/8081; printf \"PING\\n\" >&3; grep -q \"OK\" <&3' || exit 1"
+        ]
       interval: 3s
       timeout: 3s
       retries: 5
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: valoq-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: valoq-loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./loki-config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+
+  alloy:
+    image: grafana/alloy:v1.6.1
+    container_name: valoq-alloy
+    restart: unless-stopped
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy
+    volumes:
+      - ./alloy-config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy
+    depends_on:
+      loki:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: valoq-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./auth-service/observability/grafana:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
 
   message-service:
     build:
@@ -147,3 +238,10 @@ services:
         condition: service_started
       redis:
         condition: service_started
+
+volumes:
+  prometheus-data:
+  loki-data:
+  tempo-data:
+  alloy-data:
+  grafana-data:

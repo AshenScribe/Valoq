@@ -43,6 +43,10 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import server.command.AuthCommand;
+import server.command.BasicCommand;
+import server.command.RegisterCommand;
+import server.command.TokenCommand;
+import tracer.Metrics;
 
 @ChannelHandler.Sharable
 public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthCommand> {
@@ -77,6 +81,8 @@ public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthComma
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, AuthCommand msg) {
+        String authType = authType(msg);
+        Metrics.recordAuthRequest(authType);
         ChannelConfig config = ctx.channel().config();
         if (config.isAutoRead()) {
             config.setAutoRead(false);
@@ -145,7 +151,9 @@ public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthComma
 
                                                 span.recordException(error);
                                                 span.setStatus(StatusCode.ERROR);
+                                                Metrics.recordAuthError(authType, error);
                                             }
+
                                         } finally {
                                             span.end();
                                         }
@@ -154,6 +162,7 @@ public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthComma
             try {
                 span.recordException(t);
                 span.setStatus(StatusCode.ERROR);
+                Metrics.recordAuthError(authType, t);
             } finally {
                 span.end();
             }
@@ -164,6 +173,15 @@ public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthComma
 
             ctx.fireExceptionCaught(t);
         }
+    }
+
+    private static String authType(AuthCommand command) {
+        return switch (command) {
+            case BasicCommand ignored -> "basic";
+            case TokenCommand ignored -> "token";
+            case RegisterCommand ignored -> "register";
+            default -> "unknown";
+        };
     }
 
     public static synchronized void shutdownWorkers() {

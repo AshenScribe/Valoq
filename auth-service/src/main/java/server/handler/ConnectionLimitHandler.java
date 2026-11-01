@@ -32,6 +32,8 @@ import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.GlobalEventExecutor;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.metrics.Meter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -59,10 +61,19 @@ public final class ConnectionLimitHandler extends ChannelInboundHandlerAdapter {
     private final ConcurrentMap<InetAddress, AtomicLong> perIpCounters = new ConcurrentHashMap<>();
 
     private final ChannelGroup allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+    private final Meter meter = GlobalOpenTelemetry.getMeter("valoq.auth-service.connections");
 
     public ConnectionLimitHandler(long globalMaxConnections, long maxConnectionsPerIp) {
         this.globalMaxConnections = globalMaxConnections;
         this.maxConnectionsPerIp = maxConnectionsPerIp;
+        meter.gaugeBuilder("auth_active_connections")
+                .ofLongs()
+                .setDescription("Active TCP connections accepted by the auth service")
+                .buildWithCallback(measurement -> measurement.record(globalCounter.get()));
+        meter.gaugeBuilder("auth_max_connections")
+                .ofLongs()
+                .setDescription("Configured maximum TCP connections")
+                .buildWithCallback(measurement -> measurement.record(globalMaxConnections));
     }
 
     public ConnectionLimitHandler() {
