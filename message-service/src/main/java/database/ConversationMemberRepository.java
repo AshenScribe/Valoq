@@ -28,12 +28,15 @@ import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import io.opentelemetry.api.trace.Span;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import tracer.ContextPropagation;
+import tracer.DatabaseTracing;
 
 public class ConversationMemberRepository {
 
@@ -83,20 +86,67 @@ public class ConversationMemberRepository {
     }
 
     public CompletableFuture<Void> addMember(UUID conversationId, UUID userId, String role) {
-        return session.executeAsync(insertMember.bind(conversationId, userId, role, Instant.now()))
-                .toCompletableFuture()
-                .thenApply(ignored -> null);
+        Span span =
+                DatabaseTracing.start(
+                        "db.cassandra.conversation_member.insert",
+                        "cassandra",
+                        "INSERT",
+                        "conversation_member");
+        try {
+            return DatabaseTracing.finish(
+                            session.executeAsync(
+                                            insertMember.bind(
+                                                    conversationId, userId, role, Instant.now()))
+                                    .thenApply(
+                                            ContextPropagation.wrapFunction(
+                                                    ignored -> (Void) null)),
+                            span)
+                    .toCompletableFuture();
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            span.end();
+            throw e;
+        }
     }
 
     public CompletableFuture<Void> removeMember(UUID conversationId, UUID userId) {
-        return session.executeAsync(deleteMember.bind(conversationId, userId))
-                .toCompletableFuture()
-                .thenApply(ignored -> null);
+        Span span =
+                DatabaseTracing.start(
+                        "db.cassandra.conversation_member.delete",
+                        "cassandra",
+                        "DELETE",
+                        "conversation_member");
+        try {
+            return DatabaseTracing.finish(
+                            session.executeAsync(deleteMember.bind(conversationId, userId))
+                                    .thenApply(
+                                            ContextPropagation.wrapFunction(
+                                                    ignored -> (Void) null)),
+                            span)
+                    .toCompletableFuture();
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            span.end();
+            throw e;
+        }
     }
 
     public CompletionStage<List<UUID>> findMemberIds(UUID conversationId) {
-        return session.executeAsync(findMembers.bind(conversationId))
-                .thenApply(this::extractMemberUuids);
+        Span span =
+                DatabaseTracing.start(
+                        "db.cassandra.conversation_member.select",
+                        "cassandra",
+                        "SELECT",
+                        "conversation_member");
+        try {
+            return DatabaseTracing.finish(
+                            session.executeAsync(findMembers.bind(conversationId)), span)
+                    .thenApply(ContextPropagation.wrapFunction(this::extractMemberUuids));
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            span.end();
+            throw e;
+        }
     }
 
     private List<UUID> extractMemberUuids(AsyncResultSet rs) {

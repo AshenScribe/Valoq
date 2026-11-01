@@ -5,7 +5,7 @@
 **Transport:** TCP / optional TLS  
 **Framing:** Line-Based (`\n` or `\r\n` Delimited via `LineBasedFrameDecoder`)  
 **Encoding:** US-ASCII / UTF-8  
-**Max Frame Length:** 8,192 bytes (Configurable via `server.maxFrameLength`)
+**Max Frame Length:** 8,192 bytes
 
 ---
 
@@ -148,3 +148,25 @@ Uncaught exceptions and validation failures are handled uniformly by `InboundExc
 * **Algorithm:** RSA Signature with SHA-256 (`RS256`).
 * **Timing Attack Defense:** Basic authentication credentials are validated using constant-time byte comparisons (`MessageDigest.isEqual(...)`) to prevent side-channel timing analysis.
 * **Stateless Token Verification:** Issued tokens contain standard JWT claims (`sub` as the generated `usr_<hex>` identifier, `iat`, `exp`) and are verified statelessly against the immutable public key loaded via `KeyProvider`.
+
+## 5. Operational and Observability Contract
+
+The authentication service exposes no HTTP application protocol; its application
+endpoint is the TCP listener configured by `PORT` (Compose default `8081`).
+Prometheus metrics are served by the embedded OpenTelemetry Prometheus exporter
+on `PROMETHEUS_PORT` (default `9464`).
+
+Each TCP connection has a root server span. Request processing propagates the
+active OpenTelemetry context and MDC values to asynchronous work. JSON logs
+include `service.name`, `level`, and optional `trace_id` and `span_id`; these
+identifiers are structured metadata for correlation, not high-cardinality Loki
+labels. Prometheus exemplars link request metrics to Tempo, and Grafana is
+provisioned for Tempo-to-Loki and Tempo-to-Prometheus navigation.
+
+Operational signals must not contain passwords, password hashes, salts, JWTs,
+usernames, email addresses, raw SQL values, client IP addresses, or arbitrary
+exception messages in metric labels or span attributes.
+
+The wire protocol is line-delimited and clients should treat an `ERROR` response
+as a safe protocol-level failure. Internal exception details are never part of a
+server error response.

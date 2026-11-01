@@ -39,6 +39,7 @@ import protocol.BinaryMessages;
 import protocol.Envelope;
 import server.model.Event;
 import server.model.EventType;
+import tracer.ContextPropagation;
 
 public class MessageRouter {
 
@@ -73,57 +74,76 @@ public class MessageRouter {
         return memberRepository
                 .findMemberIds(event.conversationId())
                 .thenCompose(
-                        members ->
-                                eventRepository
-                                        .saveEvent(
-                                                event.conversationId(),
-                                                timeBucket,
-                                                0,
-                                                eventId,
-                                                event.eventType().name(),
-                                                event.senderId(),
-                                                event.eventId(),
-                                                event.payload())
-                                        .thenCompose(
-                                                result -> {
-                                                    Event persistedEvent =
-                                                            new Event(
-                                                                    event.senderId(),
-                                                                    event.conversationId(),
-                                                                    eventId,
-                                                                    event.eventType(),
-                                                                    event.payload(),
-                                                                    event.createdAt());
+                        ContextPropagation.wrapFunction(
+                                members ->
+                                        eventRepository
+                                                .saveEvent(
+                                                        event.conversationId(),
+                                                        timeBucket,
+                                                        0,
+                                                        eventId,
+                                                        event.eventType().name(),
+                                                        event.senderId(),
+                                                        event.eventId(),
+                                                        event.payload())
+                                                .thenCompose(
+                                                        ContextPropagation.wrapFunction(
+                                                                result -> {
+                                                                    Event persistedEvent =
+                                                                            new Event(
+                                                                                    event
+                                                                                            .senderId(),
+                                                                                    event
+                                                                                            .conversationId(),
+                                                                                    eventId,
+                                                                                    event
+                                                                                            .eventType(),
+                                                                                    event.payload(),
+                                                                                    event
+                                                                                            .createdAt());
 
-                                                    Envelope eventEnvelope =
-                                                            BinaryMessages.createEventEnvelope(
-                                                                    persistedEvent,
-                                                                    Envelope.EVENT_STREAM_ID,
-                                                                    PooledByteBufAllocator.DEFAULT);
+                                                                    Envelope eventEnvelope =
+                                                                            BinaryMessages
+                                                                                    .createEventEnvelope(
+                                                                                            persistedEvent,
+                                                                                            Envelope
+                                                                                                    .EVENT_STREAM_ID,
+                                                                                            PooledByteBufAllocator
+                                                                                                    .DEFAULT);
 
-                                                    connectionTracker.broadcastToUsers(
-                                                            members, eventEnvelope);
+                                                                    connectionTracker
+                                                                            .broadcastToUsers(
+                                                                                    members,
+                                                                                    eventEnvelope);
 
-                                                    List<CompletableFuture<?>> indexFutures =
-                                                            new ArrayList<>(members.size());
-                                                    for (UUID memberId : members) {
-                                                        indexFutures.add(
-                                                                userEventRepository
-                                                                        .saveUserEvent(
-                                                                                memberId,
-                                                                                timeBucket,
-                                                                                eventId,
-                                                                                event
-                                                                                        .conversationId())
-                                                                        .toCompletableFuture());
-                                                    }
+                                                                    List<CompletableFuture<?>>
+                                                                            indexFutures =
+                                                                                    new ArrayList<>(
+                                                                                            members
+                                                                                                    .size());
+                                                                    for (UUID memberId : members) {
+                                                                        indexFutures.add(
+                                                                                userEventRepository
+                                                                                        .saveUserEvent(
+                                                                                                memberId,
+                                                                                                timeBucket,
+                                                                                                eventId,
+                                                                                                event
+                                                                                                        .conversationId())
+                                                                                        .toCompletableFuture());
+                                                                    }
 
-                                                    return CompletableFuture.allOf(
-                                                                    indexFutures.toArray(
-                                                                            new CompletableFuture
-                                                                                    [0]))
-                                                            .thenApply(v -> eventId);
-                                                }));
+                                                                    return CompletableFuture.allOf(
+                                                                                    indexFutures
+                                                                                            .toArray(
+                                                                                                    new CompletableFuture
+                                                                                                            [0]))
+                                                                            .thenApply(
+                                                                                    ContextPropagation
+                                                                                            .wrapFunction(
+                                                                                                    v ->
+                                                                                                            eventId));
+                                                                }))));
     }
 
     public CompletionStage<Void> routeReceipt(
@@ -152,27 +172,34 @@ public class MessageRouter {
         return memberRepository
                 .findMemberIds(request.conversationId())
                 .thenCompose(
-                        members ->
-                                eventRepository
-                                        .saveEvent(
-                                                request.conversationId(),
-                                                timeBucket,
-                                                0,
-                                                receiptEventId,
-                                                type.name(),
-                                                actorId,
-                                                targetEntityId,
-                                                payload)
-                                        .thenAccept(
-                                                res -> {
-                                                    Envelope receiptEnvelope =
-                                                            BinaryMessages.createEventEnvelope(
-                                                                    receiptEvent,
-                                                                    Envelope.EVENT_STREAM_ID,
-                                                                    PooledByteBufAllocator.DEFAULT);
+                        ContextPropagation.wrapFunction(
+                                members ->
+                                        eventRepository
+                                                .saveEvent(
+                                                        request.conversationId(),
+                                                        timeBucket,
+                                                        0,
+                                                        receiptEventId,
+                                                        type.name(),
+                                                        actorId,
+                                                        targetEntityId,
+                                                        payload)
+                                                .thenAccept(
+                                                        ContextPropagation.wrapConsumer(
+                                                                res -> {
+                                                                    Envelope receiptEnvelope =
+                                                                            BinaryMessages
+                                                                                    .createEventEnvelope(
+                                                                                            receiptEvent,
+                                                                                            Envelope
+                                                                                                    .EVENT_STREAM_ID,
+                                                                                            PooledByteBufAllocator
+                                                                                                    .DEFAULT);
 
-                                                    connectionTracker.broadcastToUsers(
-                                                            members, receiptEnvelope);
-                                                }));
+                                                                    connectionTracker
+                                                                            .broadcastToUsers(
+                                                                                    members,
+                                                                                    receiptEnvelope);
+                                                                }))));
     }
 }

@@ -49,9 +49,7 @@ public final class IdleConnectionReaperHandler extends ChannelInboundHandlerAdap
         if (evt instanceof IdleStateEvent idleEvent) {
             if (idleEvent.state() == IdleState.READER_IDLE
                     || idleEvent.state() == IdleState.ALL_IDLE) {
-                LOGGER.info(
-                        "Closing idle connection from {} after timeout",
-                        ctx.channel().remoteAddress());
+                LOGGER.info("Closing idle connection after timeout");
                 ctx.close();
                 return;
             }

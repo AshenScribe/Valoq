@@ -29,32 +29,45 @@ import database.CassandraManager;
 import jwt.JwtUtil;
 import server.MessageServer;
 import server.PublicKeyClient;
+import tracer.Telemetry;
 
 public final class MessageMain {
 
     private MessageMain() {}
 
     public static void main(String[] args) throws Exception {
-        ServerConfig config = new ConfigLoader().appConfig();
-        PublicKeyClient publicKeyClient = new PublicKeyClient(config.authHost(), config.authPort());
-        String publicKey = publicKeyClient.getPublicKey();
-        JwtUtil.getInstance().init(publicKey);
-        CacheConfig cacheConfig =
-                new CacheConfig(
-                        config.redisHost(),
-                        config.redisPort(),
-                        5,
-                        config.redisDatabase(),
-                        config.redisUsername(),
-                        config.redisPassword());
-        RedisManager.getInstance(cacheConfig);
-        MessageServer server = new MessageServer(config);
-        CassandraManager.init(config);
+        Telemetry telemetry = Telemetry.initialize();
+        ServerConfig config;
+        MessageServer server = null;
         try {
+            config = new ConfigLoader().appConfig();
+            PublicKeyClient publicKeyClient =
+                    new PublicKeyClient(config.authHost(), config.authPort());
+            String publicKey = publicKeyClient.getPublicKey();
+            JwtUtil.getInstance().init(publicKey);
+            CacheConfig cacheConfig =
+                    new CacheConfig(
+                            config.redisHost(),
+                            config.redisPort(),
+                            5,
+                            config.redisDatabase(),
+                            config.redisUsername(),
+                            config.redisPassword());
+            RedisManager.getInstance(cacheConfig);
+            server = new MessageServer(config);
+            CassandraManager.init(config);
             server.start();
         } catch (InterruptedException e) {
-            server.stop();
+            if (server != null) {
+                server.stop();
+            }
+            telemetry.close();
+            throw e;
+        } catch (Exception e) {
+            telemetry.close();
             throw e;
         }
+        Runtime.getRuntime()
+                .addShutdownHook(new Thread(() -> telemetry.close(), "message-telemetry-shutdown"));
     }
 }

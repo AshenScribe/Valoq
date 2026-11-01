@@ -31,6 +31,8 @@ import io.lettuce.core.api.async.RedisAsyncCommands;
 import io.lettuce.core.pubsub.RedisPubSubListener;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import io.lettuce.core.pubsub.api.async.RedisPubSubAsyncCommands;
+import io.opentelemetry.api.trace.Span;
+import tracer.DatabaseTracing;
 
 public final class RedisManager implements AutoCloseable {
 
@@ -84,7 +86,16 @@ public final class RedisManager implements AutoCloseable {
     }
 
     public void addPubSubListener(RedisPubSubListener<String, String> listener) {
-        this.pubSubConnection.addListener(listener);
+        Span span =
+                DatabaseTracing.start("db.redis.subscribe", "redis", "SUBSCRIBE", "RedisManager");
+        try {
+            this.pubSubConnection.addListener(listener);
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     public RedisPubSubAsyncCommands<String, String> pubSubAsync() {

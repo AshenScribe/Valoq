@@ -37,6 +37,7 @@ import server.MessageServer;
 import server.Session;
 import server.model.Event;
 import server.model.EventType;
+import tracer.ContextPropagation;
 
 public class ChatMessageHandler extends SimpleChannelInboundHandler<String> {
 
@@ -94,17 +95,22 @@ public class ChatMessageHandler extends SimpleChannelInboundHandler<String> {
         }
         lastRouteFuture =
                 lastRouteFuture
-                        .handle((ignoredResult, ignoredError) -> null)
-                        .thenCompose(ignored -> messageRouter.route(event))
+                        .handle(
+                                ContextPropagation.wrapBiFunction(
+                                        (ignoredResult, ignoredError) -> null))
+                        .thenCompose(
+                                ContextPropagation.wrapFunction(
+                                        ignored -> messageRouter.route(event)))
                         .whenComplete(
-                                (ignoredResult, ignoredError) -> {
-                                    int remaining = inFlightCount.decrementAndGet();
-                                    if (remaining <= LOW_WATERMARK) {
-                                        ChannelConfig config = ctx.channel().config();
-                                        if (!config.isAutoRead()) {
-                                            config.setAutoRead(true);
-                                        }
-                                    }
-                                });
+                                ContextPropagation.wrapBiConsumer(
+                                        (ignoredResult, ignoredError) -> {
+                                            int remaining = inFlightCount.decrementAndGet();
+                                            if (remaining <= LOW_WATERMARK) {
+                                                ChannelConfig config = ctx.channel().config();
+                                                if (!config.isAutoRead()) {
+                                                    config.setAutoRead(true);
+                                                }
+                                            }
+                                        }));
     }
 }

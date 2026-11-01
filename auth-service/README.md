@@ -94,8 +94,6 @@ The service is configured via environment variables or `auth-config.properties`:
 | `DB_PASSWORD` | `valoq` | Database password. |
 | `JWT_EXPIRATION` | `300` | Issued token lifespan in seconds (default: 5 minutes). |
 | `PROMETHEUS_PORT` | `9464` | Port for the Prometheus `/metrics` endpoint. |
-```
-
 ### Grafana dashboard
 
 The portable Grafana dashboard model is available at
@@ -127,3 +125,12 @@ are provisioned automatically. Grafana Alloy collects only the auth-service Dock
 logs, parses the JSON output, and preserves `trace_id` and `span_id` metadata for trace/log
 correlation. The auth-service logs use the existing request-scoped MDC context, so logs emitted
 while a request span is current carry the matching trace identifiers.
+
+### Observability conventions
+
+Authentication spans and metrics use bounded command and error categories.
+Structured logs are emitted as one JSON event per line and include the service
+name, level, logger, thread, and optional `trace_id`/`span_id` fields. Credentials,
+JWTs, passwords, email addresses, and raw database values must never be written to
+logs, spans, or metric labels. Trace IDs and span IDs are structured metadata in
+Loki, not index labels.

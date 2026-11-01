@@ -87,3 +87,50 @@ The server bootstrap is tuned specifically for low-latency, real-time message di
 # Build executable distribution
 ./gradlew assemble
 ```
+
+### Local observability deployment
+
+The repository Compose stack publishes the message TCP protocol on `8082` and its
+container-side Prometheus endpoint on `9464`, mapped to host port `9465` so it
+does not collide with auth-service. Message traces are sent to the in-network
+OTel Collector and logs are collected from the `valoq-message-service` container
+by Alloy.
+
+The Compose credentials are development-only values. Production deployments must
+override database, Redis, JWT, Grafana, and any other service credentials through
+environment-specific secrets or a Compose override file; do not reuse the values
+in `docker-compose.yaml`.
+
+### Production observability
+
+Message-service initializes an OpenTelemetry SDK at startup. It exports OTLP
+gRPC traces to `OTEL_EXPORTER_OTLP_ENDPOINT` (default
+`http://otel-collector:4317`) and serves Prometheus metrics from the embedded
+HTTP endpoint configured by `PROMETHEUS_PORT` (default `9464`). In the root
+Compose deployment the container endpoint is published on host port `9465` to
+avoid the auth-service's host-port collision.
+
+The service creates a root `SERVER` span named `message.tcp.connection` for each
+TCP channel and propagates its context through Netty handlers, asynchronous
+Cassandra/Redis callbacks, and virtual-thread tasks. Logback emits newline-
+delimited JSON to stdout. `trace_id` and `span_id` are included only when an
+active span exists, allowing Alloy and Grafana to correlate logs with Tempo
+traces without putting trace IDs into Loki index labels.
+
+The business metrics are intentionally low cardinality:
+
+* `message_received_total{type}`
+* `message_processing_errors_total{type,error_code}`
+* `message_active_connections`
+* `message_cassandra_operation_duration_seconds{operation}`
+* `message_redis_operation_duration_seconds{operation}`
+
+JVM runtime metrics cover memory pools, garbage collection, threads, peak
+threads, and CPU. Persistence spans and errors use fixed operation/repository
+attributes only. No observability signal contains JWTs, credentials, message
+bodies, usernames, email addresses, conversation/message IDs, IP addresses,
+Redis keys/values, or raw CQL values.
+
+For local deployment, see the root [`README.md`](../README.md). Production
+deployments should override `LOG_LEVEL`, telemetry endpoints, credentials, and
+dashboard access through secrets or an environment-specific deployment overlay.

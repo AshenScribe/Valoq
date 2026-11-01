@@ -26,12 +26,15 @@ package database;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.CqlSessionBuilder;
 import config.ServerConfig;
+import io.opentelemetry.api.trace.Span;
 import java.net.InetSocketAddress;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import tracer.DatabaseTracing;
+import tracer.Metrics;
 
 public final class CassandraManager {
 
@@ -94,11 +97,22 @@ public final class CassandraManager {
 
     public static CqlSession getSession() {
         CqlSession s = session;
-        if (s == null || s.isClosed()) {
-            throw new IllegalStateException(
-                    "CassandraManager is not initialized or session is closed.");
+        Span span =
+                DatabaseTracing.start(
+                        "db.cassandra.session.acquire", "cassandra", "acquire", "CassandraManager");
+        try {
+            if (s == null || s.isClosed()) {
+                throw new IllegalStateException(
+                        "CassandraManager is not initialized or session is closed.");
+            }
+            return s;
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            Metrics.recordPersistenceError("cassandra");
+            throw e;
+        } finally {
+            span.end();
         }
-        return s;
     }
 
     public static synchronized void close() {

@@ -27,8 +27,10 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import io.opentelemetry.api.trace.Span;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
+import tracer.DatabaseTracing;
 
 public class UserEventRepository {
 
@@ -58,12 +60,33 @@ public class UserEventRepository {
 
     public CompletionStage<AsyncResultSet> getUserEvents(
             UUID userId, UUID cursor, String timeBucket) {
-        return session.executeAsync(selectStatement.bind(userId, timeBucket, cursor));
+        Span span =
+                DatabaseTracing.start(
+                        "db.cassandra.user_event.select", "cassandra", "SELECT", "user_event");
+        try {
+            return DatabaseTracing.finish(
+                    session.executeAsync(selectStatement.bind(userId, timeBucket, cursor)), span);
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            span.end();
+            throw e;
+        }
     }
 
     public CompletionStage<AsyncResultSet> saveUserEvent(
             UUID userId, String timeBucket, UUID eventId, UUID conversationId) {
-        return session.executeAsync(
-                insertStatement.bind(userId, timeBucket, eventId, conversationId));
+        Span span =
+                DatabaseTracing.start(
+                        "db.cassandra.user_event.insert", "cassandra", "INSERT", "user_event");
+        try {
+            return DatabaseTracing.finish(
+                    session.executeAsync(
+                            insertStatement.bind(userId, timeBucket, eventId, conversationId)),
+                    span);
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            span.end();
+            throw e;
+        }
     }
 }

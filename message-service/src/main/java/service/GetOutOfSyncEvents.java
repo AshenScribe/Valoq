@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import server.model.Event;
+import tracer.ContextPropagation;
 
 public class GetOutOfSyncEvents implements Service<CompletionStage<List<Event>>> {
 
@@ -68,35 +69,42 @@ public class GetOutOfSyncEvents implements Service<CompletionStage<List<Event>>>
         return userEventRepository
                 .getUserEvents(userId, cursor, timeBucket)
                 .thenCompose(
-                        userEvents -> {
-                            List<CompletionStage<Optional<Event>>> futures = new ArrayList<>();
-                            for (Row row : userEvents.currentPage()) {
-                                UUID eventId = row.getUuid("event_id");
-                                UUID conversationId = row.getUuid("conversation_id");
-                                Instant eventTime =
-                                        Instant.ofEpochMilli(Uuids.unixTimestamp(eventId));
-                                String eventBucket = BucketUtils.toTimeBucket(eventTime);
+                        ContextPropagation.wrapFunction(
+                                userEvents -> {
+                                    List<CompletionStage<Optional<Event>>> futures =
+                                            new ArrayList<>();
+                                    for (Row row : userEvents.currentPage()) {
+                                        UUID eventId = row.getUuid("event_id");
+                                        UUID conversationId = row.getUuid("conversation_id");
+                                        Instant eventTime =
+                                                Instant.ofEpochMilli(Uuids.unixTimestamp(eventId));
+                                        String eventBucket = BucketUtils.toTimeBucket(eventTime);
 
-                                futures.add(
-                                        eventRepository.getEvent(
-                                                conversationId, eventBucket, 0, eventId));
-                            }
+                                        futures.add(
+                                                eventRepository.getEvent(
+                                                        conversationId, eventBucket, 0, eventId));
+                                    }
 
-                            CompletableFuture<?>[] all =
-                                    futures.stream()
-                                            .map(CompletionStage::toCompletableFuture)
-                                            .toArray(CompletableFuture[]::new);
+                                    CompletableFuture<?>[] all =
+                                            futures.stream()
+                                                    .map(CompletionStage::toCompletableFuture)
+                                                    .toArray(CompletableFuture[]::new);
 
-                            return CompletableFuture.allOf(all)
-                                    .thenApply(
-                                            v ->
-                                                    futures.stream()
-                                                            .map(
-                                                                    CompletionStage
-                                                                            ::toCompletableFuture)
-                                                            .map(CompletableFuture::join)
-                                                            .flatMap(Optional::stream)
-                                                            .toList());
-                        });
+                                    return CompletableFuture.allOf(all)
+                                            .thenApply(
+                                                    ContextPropagation.wrapFunction(
+                                                            v ->
+                                                                    futures.stream()
+                                                                            .map(
+                                                                                    CompletionStage
+                                                                                            ::toCompletableFuture)
+                                                                            .map(
+                                                                                    CompletableFuture
+                                                                                            ::join)
+                                                                            .flatMap(
+                                                                                    Optional
+                                                                                            ::stream)
+                                                                            .toList()));
+                                }));
     }
 }

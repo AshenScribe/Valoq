@@ -25,7 +25,10 @@ package cache;
 
 import io.lettuce.core.api.async.RedisAsyncCommands;
 import io.lettuce.core.pubsub.api.async.RedisPubSubAsyncCommands;
+import io.opentelemetry.api.trace.Span;
 import java.util.concurrent.CompletionStage;
+import tracer.DatabaseTracing;
+import tracer.Metrics;
 
 public final class RedisRepository {
 
@@ -59,27 +62,61 @@ public final class RedisRepository {
         if (redisAsyncCommands == null) {
             return java.util.concurrent.CompletableFuture.completedFuture(null);
         }
-        return redisAsyncCommands.set(key, value);
+        Span span = DatabaseTracing.start("db.redis.set", "redis", "SET", "RedisRepository");
+        try {
+            return DatabaseTracing.finish(redisAsyncCommands.set(key, value), span, "redis");
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            Metrics.recordPersistenceError("redis");
+            span.end();
+            throw e;
+        }
     }
 
     public CompletionStage<String> read(String key) {
         if (redisAsyncCommands == null) {
             return java.util.concurrent.CompletableFuture.completedFuture(null);
         }
-        return redisAsyncCommands.get(key);
+        Span span = DatabaseTracing.start("db.redis.get", "redis", "GET", "RedisRepository");
+        try {
+            return DatabaseTracing.finish(redisAsyncCommands.get(key), span, "redis");
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            Metrics.recordPersistenceError("redis");
+            span.end();
+            throw e;
+        }
     }
 
     public CompletionStage<Long> publish(String channel, String message) {
         if (redisPubSubAsyncCommands == null) {
             return java.util.concurrent.CompletableFuture.completedFuture(0L);
         }
-        return redisPubSubAsyncCommands.publish(channel, message);
+        Span span =
+                DatabaseTracing.start("db.redis.publish", "redis", "PUBLISH", "RedisRepository");
+        try {
+            return DatabaseTracing.finish(
+                    redisPubSubAsyncCommands.publish(channel, message), span, "redis");
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            Metrics.recordPersistenceError("redis");
+            span.end();
+            throw e;
+        }
     }
 
     public CompletionStage<Long> delete(String key) {
         if (redisAsyncCommands == null) {
             return java.util.concurrent.CompletableFuture.completedFuture(0L);
         }
-        return redisAsyncCommands.del(key);
+        Span span = DatabaseTracing.start("db.redis.delete", "redis", "DEL", "RedisRepository");
+        try {
+            return DatabaseTracing.finish(redisAsyncCommands.del(key), span, "redis");
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            Metrics.recordPersistenceError("redis");
+            span.end();
+            throw e;
+        }
     }
 }

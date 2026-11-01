@@ -29,12 +29,15 @@ import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.uuid.Uuids;
+import io.opentelemetry.api.trace.Span;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import server.model.Event;
 import server.model.EventType;
+import tracer.ContextPropagation;
+import tracer.DatabaseTracing;
 
 public class EventRepository {
 
@@ -83,69 +86,107 @@ public class EventRepository {
             UUID entityId,
             String payload) {
 
-        return session.executeAsync(
-                insertStatement.bind(
-                        conversationId,
-                        timeBucket,
-                        hashBucket,
-                        eventId,
-                        eventType,
-                        actorId,
-                        entityId,
-                        payload));
+        Span span =
+                DatabaseTracing.start("db.cassandra.event.insert", "cassandra", "INSERT", "event");
+        try {
+            return DatabaseTracing.finish(
+                    session.executeAsync(
+                            insertStatement.bind(
+                                    conversationId,
+                                    timeBucket,
+                                    hashBucket,
+                                    eventId,
+                                    eventType,
+                                    actorId,
+                                    entityId,
+                                    payload)),
+                    span);
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            span.end();
+            throw e;
+        }
     }
 
     public CompletionStage<Optional<Event>> getEvent(
             UUID conversationId, String timeBucket, int hashBucket, UUID eventId) {
 
-        return session.executeAsync(
-                        getEventStatement.bind(conversationId, timeBucket, hashBucket, eventId))
-                .thenApply(
-                        result -> {
-                            Row row = result.one();
+        Span span =
+                DatabaseTracing.start("db.cassandra.event.select", "cassandra", "SELECT", "event");
+        try {
+            return DatabaseTracing.finish(
+                            session.executeAsync(
+                                    getEventStatement.bind(
+                                            conversationId, timeBucket, hashBucket, eventId)),
+                            span)
+                    .thenApply(
+                            ContextPropagation.wrapFunction(
+                                    result -> {
+                                        Row row = result.one();
 
-                            if (row == null) {
-                                return Optional.empty();
-                            }
+                                        if (row == null) {
+                                            return Optional.empty();
+                                        }
 
-                            UUID extractedEventId = row.getUuid("event_id");
-                            Instant timestamp =
-                                    Instant.ofEpochMilli(Uuids.unixTimestamp(extractedEventId));
+                                        UUID extractedEventId = row.getUuid("event_id");
+                                        Instant timestamp =
+                                                Instant.ofEpochMilli(
+                                                        Uuids.unixTimestamp(extractedEventId));
 
-                            return Optional.of(
-                                    new Event(
-                                            row.getUuid("actor_id"),
-                                            row.getUuid("conversation_id"),
-                                            extractedEventId,
-                                            EventType.valueOf(row.getString("event_type")),
-                                            row.getString("payload"),
-                                            timestamp));
-                        });
+                                        return Optional.of(
+                                                new Event(
+                                                        row.getUuid("actor_id"),
+                                                        row.getUuid("conversation_id"),
+                                                        extractedEventId,
+                                                        EventType.valueOf(
+                                                                row.getString("event_type")),
+                                                        row.getString("payload"),
+                                                        timestamp));
+                                    }));
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            span.end();
+            throw e;
+        }
     }
 
     public CompletionStage<Optional<Event>> getEvents(
             UUID conversationId, String timeBucket, int hashBucket, UUID eventId) {
 
-        return session.executeAsync(
-                        selectStatement.bind(conversationId, timeBucket, hashBucket, eventId))
-                .thenApply(
-                        result -> {
-                            Row row = result.one();
+        Span span =
+                DatabaseTracing.start("db.cassandra.event.select", "cassandra", "SELECT", "event");
+        try {
+            return DatabaseTracing.finish(
+                            session.executeAsync(
+                                    selectStatement.bind(
+                                            conversationId, timeBucket, hashBucket, eventId)),
+                            span)
+                    .thenApply(
+                            ContextPropagation.wrapFunction(
+                                    result -> {
+                                        Row row = result.one();
 
-                            if (row == null) {
-                                return Optional.empty();
-                            }
-                            UUID extractedEventId = row.getUuid("event_id");
-                            Instant timestamp =
-                                    Instant.ofEpochMilli(Uuids.unixTimestamp(extractedEventId));
-                            return Optional.of(
-                                    new Event(
-                                            row.getUuid("actor_id"),
-                                            row.getUuid("conversation_id"),
-                                            extractedEventId,
-                                            EventType.valueOf(row.getString("event_type")),
-                                            row.getString("payload"),
-                                            timestamp));
-                        });
+                                        if (row == null) {
+                                            return Optional.empty();
+                                        }
+                                        UUID extractedEventId = row.getUuid("event_id");
+                                        Instant timestamp =
+                                                Instant.ofEpochMilli(
+                                                        Uuids.unixTimestamp(extractedEventId));
+                                        return Optional.of(
+                                                new Event(
+                                                        row.getUuid("actor_id"),
+                                                        row.getUuid("conversation_id"),
+                                                        extractedEventId,
+                                                        EventType.valueOf(
+                                                                row.getString("event_type")),
+                                                        row.getString("payload"),
+                                                        timestamp));
+                                    }));
+        } catch (RuntimeException e) {
+            DatabaseTracing.recordFailure(span, e);
+            span.end();
+            throw e;
+        }
     }
 }

@@ -2,14 +2,16 @@
 
 **Version:** 1.0  
 **Status:** Stable  
-**Transport:** Raw TCP / TLS  
+**Transport:** Raw TCP (TLS may be terminated by the deployment)
 **Byte Order:** Big-Endian (Network Byte Order)
 
 ---
 
 ## 1. Frame Architecture
 
-Every packet transmitted between client and server consists of a fixed **12-byte header** followed by an optional, length-prefixed payload body.
+Every packet transmitted between client and server consists of a fixed **12-byte
+header** followed by exactly `body_length` payload bytes. The header's length
+field is the frame body's byte count; it is not an additional length prefix.
 
 ```
 0                   1                   2                   3
@@ -35,7 +37,7 @@ Every packet transmitted between client and server consists of a fixed **12-byte
 | **Opcode**      | `uint8`  | 2      | Identifies the operation type (see Section 2).                                                                              |
 | **Flags**       | `uint8`  | 3      | Reserved bitmask for future extensions (e.g. payload encryption, tracing). Default: `0x00`.                                 |
 | **Stream ID**   | `int32`  | 4      | Signed integer correlating request and response frames. For unprompted server pushes (events), this field is `-1`.          |
-| **Body Length** | `uint32` | 8      | Size of the following payload data in bytes (`0` indicates an empty body). Maximum allowed frame: 10,485,760 bytes (10 MB). |
+| **Body Length** | `uint32` | 8      | Size of the following payload data in bytes (`0` indicates an empty body). The decoder rejects frames larger than 10,485,760 bytes (10 MiB). |
 
 ---
 
@@ -99,7 +101,7 @@ Issued back to the sending socket once the message is durably persisted.
 
 #### `EVENT` (`0x04`) — Server $\rightarrow$ Client (Real-Time Push)
 Pushed to conversation participants when new messages or receipts occur.
-* **Stream ID:** `-1` (`0xFFFFFFFF`).
+* **Stream ID:** `-1` (`0xFFFFFFFF`) for unsolicited fanout events.
 * **Payload:**
   * `event_type`: `Short String` (e.g. `MESSAGE_CREATED`, `MESSAGE_DELIVERED`, `MESSAGE_READ`).
   * `event_id`: `UUID (16 bytes)` (Unique TimeUUID).
@@ -139,7 +141,10 @@ Requests all timeline events occurring strictly after a given cursor.
   * `cursor_event_id`: `UUID (16 bytes)` (TimeUUID of the last known client-side event).
 
 #### Server Response:
-The server streams a succession of `EVENT (0x04)` frames stamped with the request's `streamId`, ending with an empty acknowledgment frame.
+The server streams a succession of `EVENT (0x04)` frames stamped with the
+request's `streamId`. No separate end-of-stream frame is currently emitted;
+the client uses the response stream ID and the application event set to
+associate the returned events with the request.
 
 ---
 
@@ -149,4 +154,49 @@ The server streams a succession of `EVENT (0x04)` frames stamped with the reques
 Indicates protocol violation, authorization failure, or overload.
 * **Stream ID:** Echoes client stream ID if known; `-1` if framing is corrupt.
 * **Payload:**
-  * `error_message`: `Short String`.
+  * `error_message`: `Short String` (UTF-8, safe client-facing text).
+
+Errors generated after a known frame preserve that frame's stream ID. Errors
+detected before a complete header is available use `-1` when a response can be
+written; fatal decoder failures may close the channel without a response.
+
+## 5. Connection, Ordering, and Resource Semantics
+
+1. The server creates one root `SERVER` span named `message.tcp.connection` per
+   accepted TCP channel and ends it exactly once when the channel closes.
+2. `INIT` must complete successfully before `SEND`, `SYNC`, `ACK_DELIVERED`, or
+   `ACK_READ` requests are accepted for that channel.
+3. A client may reuse stream IDs only after the corresponding operation has
+   completed. The server preserves per-connection route ordering for message
+   mutations and receipts.
+4. `SEND` and receipt operations may complete asynchronously. Responses are
+   associated with the request stream ID; unsolicited fanout uses `-1`.
+5. Payload buffers are binary and length-delimited. Clients must not send
+   trailing bytes beyond the declared logical payload for a command.
+6. The server applies backpressure by disabling Netty `autoRead` when the
+   connection's in-flight operation count reaches its high watermark and
+   re-enabling it after the low watermark is reached.
+7. Connections idle for 300 seconds are closed by the idle reaper. Graceful
+   shutdown closes the listener, notifies active clients, closes channels, and
+   releases database/cache resources.
+
+## 6. Observability and Privacy
+
+The service exports OTLP gRPC traces to the configured Collector and exposes
+Prometheus metrics from the embedded endpoint. The principal business metrics
+are:
+
+* `message_received_total{type}`
+* `message_processing_errors_total{type,error_code}`
+* `message_active_connections`
+* `message_cassandra_operation_duration_seconds{operation}`
+* `message_redis_operation_duration_seconds{operation}`
+
+Label values are fixed protocol or error categories. Persistence spans use only
+fixed database system, operation, and repository attributes. JSON logs include
+the service, level, logger, thread, and optional trace/span IDs. Trace IDs are
+stored as Loki structured metadata rather than labels.
+
+JWTs, credentials, usernames, email addresses, message bodies, conversation IDs,
+message IDs, IP addresses, Redis keys/values, raw CQL values, and arbitrary
+exception messages must not appear in logs, metric labels, or span attributes.

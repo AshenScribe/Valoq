@@ -6,6 +6,11 @@ junit = "5.7.1"
 lettuce = "7.8.0.RELEASE"
 mockito = "5.24.0"
 netty = "4.2.18.Final"
+opentelemetry = "1.49.0"
+opentelemetry-prometheus = "1.49.0-alpha"
+opentelemetry-runtime-metrics = "1.26.0-alpha"
+logback = "1.5.18"
+logstash-encoder = "8.1"
 slf4j = "2.0.19"
 owner = "1.0.12"
 testcontainers = "2.0.5"
@@ -35,8 +40,17 @@ netty-common = { module = "io.netty:netty-common" }
 netty-codec = { module = "io.netty:netty-codec" }
 netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll" }
 
+opentelemetry-api = { module = "io.opentelemetry:opentelemetry-api", version.ref = "opentelemetry" }
+opentelemetry-sdk = { module = "io.opentelemetry:opentelemetry-sdk", version.ref = "opentelemetry" }
+opentelemetry-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp", version.ref = "opentelemetry" }
+opentelemetry-exporter-prometheus = { module = "io.opentelemetry:opentelemetry-exporter-prometheus", version.ref = "opentelemetry-prometheus" }
+opentelemetry-runtime-metrics = { module = "io.opentelemetry.instrumentation:opentelemetry-runtime-metrics", version.ref = "opentelemetry-runtime-metrics" }
+opentelemetry-sdk-testing = { module = "io.opentelemetry:opentelemetry-sdk-testing", version.ref = "opentelemetry" }
+
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+logstash-encoder = { module = "net.logstash.logback:logstash-logback-encoder", version.ref = "logstash-encoder" }
 
 owner = { module = "org.aeonbits.owner:owner", version.ref = "owner" }
 
@@ -57,6 +71,12 @@ netty = [
     "netty-handler"
 ]
 slf4j = [
-    "slf4j-api",
-    "slf4j-simple"
+    "slf4j-api"
+]
+otel = [
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp",
+    "opentelemetry-exporter-prometheus",
+    "opentelemetry-runtime-metrics"
 ]

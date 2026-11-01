@@ -30,6 +30,7 @@ import server.MessageServer;
 import server.Session;
 import server.model.Event;
 import service.GetOutOfSyncEvents;
+import tracer.ContextPropagation;
 
 public class SyncHandler extends SimpleChannelInboundHandler<String> {
 
@@ -57,24 +58,26 @@ public class SyncHandler extends SimpleChannelInboundHandler<String> {
         getOutOfSyncEvents
                 .serve()
                 .thenAccept(
-                        events -> {
-                            for (Event event : events) {
-                                String response =
-                                        String.format(
-                                                "EVENT %s %s %s %s %s\n",
-                                                event.eventType().name(),
-                                                event.eventId(),
-                                                event.conversationId(),
-                                                event.senderId(),
-                                                event.payload());
-                                ctx.write(response);
-                            }
-                            ctx.flush();
-                        })
+                        ContextPropagation.wrapConsumer(
+                                events -> {
+                                    for (Event event : events) {
+                                        String response =
+                                                String.format(
+                                                        "EVENT %s %s %s %s %s\n",
+                                                        event.eventType().name(),
+                                                        event.eventId(),
+                                                        event.conversationId(),
+                                                        event.senderId(),
+                                                        event.payload());
+                                        ctx.write(response);
+                                    }
+                                    ctx.flush();
+                                }))
                 .exceptionally(
-                        error -> {
-                            ctx.writeAndFlush("ERROR: SYNC failed\n");
-                            return null;
-                        });
+                        ContextPropagation.wrapFunction(
+                                error -> {
+                                    ctx.writeAndFlush("ERROR: SYNC failed\n");
+                                    return null;
+                                }));
     }
 }

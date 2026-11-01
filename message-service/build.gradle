@@ -25,10 +25,14 @@ dependencies {
     implementation platform(libs.netty.bom)
     implementation libs.bundles.netty
     implementation libs.bundles.slf4j
+    runtimeOnly libs.logback.classic
+    runtimeOnly libs.logstash.encoder
+    implementation libs.bundles.otel
 
     implementation "${libs.netty.transport.native.epoll.get().module}:$epollClassifier"
 
     testImplementation libs.bundles.testing.suite
+    testImplementation libs.opentelemetry.sdk.testing
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${libs.versions.junit.get()}"
     testRuntimeOnly libs.junit.platform.launcher
 

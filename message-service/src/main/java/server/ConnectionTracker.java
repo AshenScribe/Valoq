@@ -28,6 +28,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.util.concurrent.GlobalEventExecutor;
+import io.opentelemetry.api.GlobalOpenTelemetry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -37,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import protocol.BinaryMessages;
 import protocol.Envelope;
 import server.model.RoutedMessage;
+import tracer.ContextPropagation;
 
 public class ConnectionTracker {
 
@@ -57,6 +59,11 @@ public class ConnectionTracker {
         this.allChannels = channelGroup;
         this.redisRepository = redisRepository;
         this.nodeId = nodeId;
+        GlobalOpenTelemetry.getMeter("valoq.message-service")
+                .gaugeBuilder("message_active_connections")
+                .ofLongs()
+                .setDescription("Active message-service TCP connections")
+                .buildWithCallback(measurement -> measurement.record(this.allChannels.size()));
     }
 
     public ClientConnection track(Channel channel) {
@@ -177,18 +184,20 @@ public class ConnectionTracker {
             redisRepository
                     .read("user_presence:" + userId)
                     .thenAccept(
-                            targetNodeId -> {
-                                try {
-                                    if (targetNodeId != null) {
-                                        RoutedMessage routedMessage =
-                                                new RoutedMessage(userId, envelope);
-                                        redisRepository.publish(
-                                                "node:" + targetNodeId, routedMessage.toJson());
-                                    }
-                                } finally {
-                                    envelope.release();
-                                }
-                            });
+                            ContextPropagation.wrapConsumer(
+                                    targetNodeId -> {
+                                        try {
+                                            if (targetNodeId != null) {
+                                                RoutedMessage routedMessage =
+                                                        new RoutedMessage(userId, envelope);
+                                                redisRepository.publish(
+                                                        "node:" + targetNodeId,
+                                                        routedMessage.toJson());
+                                            }
+                                        } finally {
+                                            envelope.release();
+                                        }
+                                    }));
             return 0;
         }
     }

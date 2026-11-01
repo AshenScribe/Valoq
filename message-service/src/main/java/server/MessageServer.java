@@ -50,6 +50,8 @@ import protocol.EnvelopeEncoder;
 import server.handler.CommandDispatcherHandler;
 import server.handler.ConnectionLifecycleHandler;
 import server.handler.IdleConnectionReaperHandler;
+import server.handler.InboundExceptionHandler;
+import server.handler.TracingMetadataHandler;
 
 public class MessageServer {
 
@@ -138,7 +140,8 @@ public class MessageServer {
             ch.attr(SESSION_KEY).set(new Session());
             connectionTracker.track(ch);
 
-            // 1. Idle state reaper
+            // 1. Connection tracing and idle state reaper
+            ch.pipeline().addFirst("tracingMetadataHandler", TracingMetadataHandler.INSTANCE);
             ch.pipeline()
                     .addLast("idleStateHandler", new IdleStateHandler(300, 0, 0, TimeUnit.SECONDS));
             ch.pipeline().addLast("idleReaperHandler", IdleConnectionReaperHandler.INSTANCE);
@@ -156,6 +159,7 @@ public class MessageServer {
                     .addLast(
                             "commandDispatcher",
                             new CommandDispatcherHandler(connectionTracker, messageRouter));
+            ch.pipeline().addLast("inboundExceptionHandler", InboundExceptionHandler.INSTANCE);
         }
     }
 }
