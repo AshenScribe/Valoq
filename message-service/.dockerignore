@@ -1,0 +1,10 @@
+src/e2eTest
+src/test
+LICENSE_HEADER
+PROTOCOL.md
+README.md
+config/
+.gradle/
+.settings/
+bin/
+build/
