@@ -14,7 +14,6 @@ slf4j = "2.0.19"
 testcontainer = "2.0.5"
 
 [libraries]
-
 bcrypt = { module = "at.favre.lib:bcrypt", version.ref = "bcrypt" }
 
 groovy-core = { module = "org.codehaus.groovy:groovy", version.ref = "groovy" }
@@ -59,6 +58,7 @@ slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 
 [bundles]
 testing-suite = ["groovy-core", "junit-jupiter-api", "junit-jupiter-engine", "junit-jupiter-params"]
+
 netty = [
     "netty-buffer",
     "netty-transport",
@@ -67,6 +67,15 @@ netty = [
     "netty-transport-native-epoll",
     "netty-handler"
 ]
+
+otel = [
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp",
+    "otel-netty",
+    "otel-jdbc"
+]
+
 slf4j = [
     "slf4j-api",
     "slf4j-simple"

@@ -26,8 +26,17 @@ package server.handler;
 import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
 import io.netty.channel.SimpleChannelInboundHandler;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
@@ -41,15 +50,17 @@ public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthComma
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AuthenticationHandler.class);
     public static final AuthenticationHandler INSTANCE = new AuthenticationHandler();
+    private static final Tracer TRACER = GlobalOpenTelemetry.getTracer("valoq.auth-service");
 
-    // Dedicated worker executor for CPU/DB auth tasks (lazily initialized / recreated on demand)
-    private static volatile ExecutorService authWorkers =
-            Executors.newVirtualThreadPerTaskExecutor();
+    // Dedicated worker executor for CPU/DB auth tasks (lazily initialized /
+    // recreated on demand)
+    private static volatile ExecutorService authWorkers = Executors.newVirtualThreadPerTaskExecutor();
 
     // Sized to match database pool capacity (HikariCP max 10)
     private static final Semaphore DB_CONCURRENCY_GATE = new Semaphore(10);
 
-    public AuthenticationHandler() {}
+    public AuthenticationHandler() {
+    }
 
     private static ExecutorService getWorkers() {
         ExecutorService workers = authWorkers;
@@ -72,61 +83,83 @@ public class AuthenticationHandler extends SimpleChannelInboundHandler<AuthComma
             config.setAutoRead(false);
         }
 
+        Context parentContext = Context.current();
+        Span span = TRACER.spanBuilder("auth.authenticate")
+                .setParent(parentContext)
+                .setSpanKind(SpanKind.SERVER)
+                .startSpan();
+
+        Context authContext = parentContext.with(span);
+
         try {
             CompletableFuture.supplyAsync(
-                            () -> {
-                                boolean acquired = false;
-                                try {
-                                    acquired = DB_CONCURRENCY_GATE.tryAcquire(2, TimeUnit.SECONDS);
-                                    if (!acquired) {
-                                        throw new IllegalStateException(
-                                                "Server overloaded, please retry later");
-                                    }
+                    () -> {
+                        try (Scope scope = authContext.makeCurrent()) {
+                            boolean acquired = false;
 
-                                    if (!ctx.channel().isActive()) {
-                                        LOGGER.debug(
-                                                "Client disconnected before auth execution started; discarding task");
-                                        return null;
-                                    }
+                            try {
+                                acquired = DB_CONCURRENCY_GATE.tryAcquire(
+                                        2, TimeUnit.SECONDS);
 
-                                    return AuthenticationHandlerFactory.getAuthenticationHandler(
-                                                    msg)
-                                            .login(msg);
-                                } catch (InterruptedException e) {
-                                    Thread.currentThread().interrupt();
-                                    throw new RuntimeException(
-                                            "Authentication task interrupted", e);
-                                } finally {
-                                    if (acquired) {
-                                        DB_CONCURRENCY_GATE.release();
-                                    }
+                                if (!acquired) {
+                                    throw new IllegalStateException(
+                                            "Server overloaded, please retry later");
                                 }
-                            },
-                            getWorkers())
-                    .whenComplete(
-                            (token, ex) -> {
-                                ctx.channel()
-                                        .eventLoop()
-                                        .execute(
-                                                () -> {
-                                                    try {
-                                                        if (ex != null) {
-                                                            ctx.fireExceptionCaught(ex);
-                                                        } else if (token != null) {
-                                                            ctx.writeAndFlush(token);
-                                                        }
-                                                    } finally {
-                                                        if (ctx.channel().isOpen()
-                                                                && !config.isAutoRead()) {
-                                                            config.setAutoRead(true);
-                                                        }
-                                                    }
-                                                });
-                            });
-        } catch (Throwable t) {
+
+                                if (!ctx.channel().isActive()) {
+                                    LOGGER.debug(
+                                            "Client disconnected before auth execution started; "
+                                                    + "discarding task");
+                                    return null;
+                                }
+
+                                return AuthenticationHandlerFactory
+                                        .getAuthenticationHandler(msg)
+                                        .login(msg);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                throw new RuntimeException(
+                                        "Authentication task interrupted", e);
+                            } finally {
+                                if (acquired) {
+                                    DB_CONCURRENCY_GATE.release();
+                                }
+                            }
+                        }
+                    },
+                    getWorkers())
+                    .whenComplete((token, ex) -> {
+                        try {
+                            if (ex != null) {
+                                Throwable error = ex;
+                                while ((error instanceof CompletionException
+                                        || error instanceof ExecutionException)
+                                        && error.getCause() != null) {
+                                    error = error.getCause();
+                                }
+
+                                span.recordException(error);
+                                span.setStatus(StatusCode.ERROR);
+                            }
+                        } finally {
+                            span.end();
+                        }
+
+                    });
+        } catch (
+
+        Throwable t) {
+            try {
+                span.recordException(t);
+                span.setStatus(StatusCode.ERROR);
+            } finally {
+                span.end();
+            }
+
             if (ctx.channel().isOpen() && !config.isAutoRead()) {
                 config.setAutoRead(true);
             }
+
             ctx.fireExceptionCaught(t);
         }
     }

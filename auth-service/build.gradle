@@ -34,6 +34,9 @@ dependencies {
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${libs.versions.junit.get()}"
     testRuntimeOnly libs.junit.platform.launcher
 
+    implementation platform(libs.opentelemetry.instrumentation.bom.alpha)
+    implementation libs.bundles.otel
+
     implementation libs.jjwt.api
     runtimeOnly libs.jjwt.impl
     runtimeOnly libs.jjwt.jackson
@@ -52,7 +55,6 @@ dependencies {
     e2eTestImplementation libs.testcontainers.core
 
     implementation libs.bcrypt
-
     implementation libs.jackson.databind
 }
 
@@ -141,4 +143,6 @@ tasks.named('jacocoTestReport', JacocoReport) {
 
 apply from: 'gradle/dev-certs.gradle'
 
-dependencyLocking { lockAllConfigurations() }
+dependencyLocking {
+    lockAllConfigurations()
+}

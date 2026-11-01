@@ -6,7 +6,6 @@ ARG GRADLE_USER_HOME=/root/.gradle
 ENV GRADLE_USER_HOME=${GRADLE_USER_HOME}
 
 WORKDIR /app
-
 COPY gradlew .
 COPY gradle ./gradle
 
@@ -41,7 +40,6 @@ FROM eclipse-temurin:21-jre-jammy AS runtime
 WORKDIR /app
 
 COPY --from=builder /app/build/install/auth-service /app
-
 EXPOSE 8081
 
 ENV JAVA_OPTS="-XX:+UseZGC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
