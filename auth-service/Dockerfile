@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM eclipse-temurin:25-jdk AS builder
+FROM eclipse-temurin:21-jdk AS builder
 
 ARG GRADLE_USER_HOME=/root/.gradle
 ENV GRADLE_USER_HOME=${GRADLE_USER_HOME}
@@ -36,7 +36,7 @@ RUN --mount=type=cache,target=${GRADLE_USER_HOME} \
         -x spotlessApply \
         --console=plain
 
-FROM eclipse-temurin:25-jre-jammy AS runtime
+FROM eclipse-temurin:21-jre-jammy AS runtime
 
 WORKDIR /app
 

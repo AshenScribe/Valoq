@@ -7,6 +7,7 @@ jackson-databind = "2.22.2"
 jjwt = "0.13.0"
 junit = "5.7.1"
 netty = "4.2.18.Final"
+opentelemetry = "1.49.0"
 owner = "1.0.12"
 postgresql = "42.7.13"
 slf4j = "2.0.19"
@@ -40,6 +41,10 @@ netty-transport = { module = "io.netty:netty-transport" }
 netty-common = { module = "io.netty:netty-common" }
 netty-codec = { module = "io.netty:netty-codec" }
 netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll" }
+
+opentelemetry-api = { module = "io.opentelemetry:opentelemetry-api", version.ref = "opentelemetry" }
+opentelemetry-sdk = { module = "io.opentelemetry:opentelemetry-sdk", version.ref = "opentelemetry" }
+opentelemetry-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp", version.ref = "opentelemetry" }
 
 owner = { module = "org.aeonbits.owner:owner", version.ref = "owner" }
 

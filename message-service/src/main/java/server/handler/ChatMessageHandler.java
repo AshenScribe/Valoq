@@ -94,10 +94,10 @@ public class ChatMessageHandler extends SimpleChannelInboundHandler<String> {
         }
         lastRouteFuture =
                 lastRouteFuture
-                        .handle((_, _) -> null)
-                        .thenCompose(_ -> messageRouter.route(event))
+                        .handle((ignoredResult, ignoredError) -> null)
+                        .thenCompose(ignored -> messageRouter.route(event))
                         .whenComplete(
-                                (_, _) -> {
+                                (ignoredResult, ignoredError) -> {
                                     int remaining = inFlightCount.decrementAndGet();
                                     if (remaining <= LOW_WATERMARK) {
                                         ChannelConfig config = ctx.channel().config();
